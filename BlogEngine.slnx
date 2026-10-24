@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BlogEngine.Core/BlogEngine.Core.csproj" />
+    <Project Path="src/BlogEngine.Infrastructure/BlogEngine.Infrastructure.csproj" />
+    <Project Path="src/BlogEngine.Api/BlogEngine.Api.csproj" />
+    <Project Path="src/BlogEngine.Operator/BlogEngine.Operator.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BlogEngine.UnitTests/BlogEngine.UnitTests.csproj" />
+    <Project Path="tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj" />
+    <Project Path="tests/BlogEngine.Performance/BlogEngine.Performance.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>blog-engine-operator-660a1894-babd-4838-bc07-54e465d6d012</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../BlogEngine.Core/BlogEngine.Core.csproj" />
+    <ProjectReference Include="../BlogEngine.Infrastructure/BlogEngine.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

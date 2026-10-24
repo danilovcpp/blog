@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../BlogEngine.Core/BlogEngine.Core.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Persistence/Accounts/" />
+    <Folder Include="Persistence/Publishing/" />
+    <Folder Include="Persistence/Discussions/" />
+    <Folder Include="Persistence/Engagement/" />
+    <Folder Include="Persistence/Migrations/" />
+    <Folder Include="ReadModels/" />
+    <Folder Include="Identity/" />
+    <Folder Include="Visitors/" />
+    <Folder Include="Maintenance/" />
+  </ItemGroup>
+</Project>

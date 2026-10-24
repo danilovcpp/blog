@@ -1,2 +1,31 @@
 # Local Spec Kit CLI environment
 /.tools/spec-kit/
+
+# .NET output and local verification reports
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+**/TestResults/
+coverage/
+*.log
+
+# Credentials and per-machine configuration (package lock files are versioned)
+.env
+.env.*
+*.local.json
+*.pfx
+*.p12
+*.key
+secrets/
+
+# Editors and OS files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db

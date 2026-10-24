@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/BlogEngine.Core/BlogEngine.Core.csproj" />
+    <ProjectReference Include="../../src/BlogEngine.Infrastructure/BlogEngine.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Require Linux Docker engine
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $engine = docker info --format '{{.OSType}}'
+          if ($LASTEXITCODE -ne 0 -or $engine -ne 'linux') { throw 'A Linux Docker engine is required.' }
+      - name: Restore tools and locked packages
+        shell: pwsh
+        run: |
+          dotnet tool restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet restore BlogEngine.slnx --locked-mode
+          exit $LASTEXITCODE
+      - name: Build Release without warnings
+        run: dotnet build BlogEngine.slnx -c Release --no-restore -warnaserror
+      - name: Verify format and analyzers
+        run: dotnet format BlogEngine.slnx --verify-no-changes --no-restore
+      - name: Unit tests
+        run: dotnet test tests/BlogEngine.UnitTests/BlogEngine.UnitTests.csproj -c Release --no-build --logger "trx;LogFileName=unit.trx" --results-directory artifacts/test-results
+      - name: Integration tests with real PostgreSQL
+        run: dotnet test tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration.trx" --results-directory artifacts/test-results
+      - name: Reject empty or skipped test suites
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($suite in @('unit', 'integration')) {
+            $file = "artifacts/test-results/$suite.trx"
+            if (!(Test-Path -LiteralPath $file)) { throw "Missing results: $suite" }
+            [xml]$result = Get-Content -LiteralPath $file -Raw
+            $counters = $result.TestRun.ResultSummary.Counters
+            if ([int]$counters.total -eq 0 -or [int]$counters.total -ne [int]$counters.passed) {
+              throw "Every discovered test must pass in $suite; skipped tests are failures."
+            }
+          }
+      - name: Upload verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-results
+          path: artifacts/
+          if-no-files-found: error

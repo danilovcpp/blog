@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Folder Include="Accounts/Domain/" />
+    <Folder Include="Accounts/Application/" />
+    <Folder Include="Accounts/Contracts/" />
+    <Folder Include="Publishing/Domain/" />
+    <Folder Include="Publishing/Application/" />
+    <Folder Include="Publishing/Contracts/" />
+    <Folder Include="Discussions/Domain/" />
+    <Folder Include="Discussions/Application/" />
+    <Folder Include="Discussions/Contracts/" />
+    <Folder Include="Engagement/Domain/" />
+    <Folder Include="Engagement/Application/" />
+    <Folder Include="Engagement/Contracts/" />
+    <Folder Include="ReadModels/" />
+    <Folder Include="Shared/" />
+  </ItemGroup>
+</Project>
