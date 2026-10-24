@@ -3,6 +3,7 @@ using BlogEngine.Core.Publishing.Contracts;
 using BlogEngine.Core.Publishing.Domain;
 using BlogEngine.Core.Shared;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlogEngine.Infrastructure.Persistence.Publishing;
 
@@ -16,7 +17,7 @@ public sealed class PublicationWriteScope(BlogDbContext db) : IPublicationWriteS
         // Refresh any previously tracked instance only after the lock, including state/version/counters.
         await db.Entry(entity).ReloadAsync(ct);
         var now = await UtcNowAsync(db, ct);
-        var result = await operation(new PublicationWriteSession(db, entity, now), ct);
+        var result = await operation(new PublicationWriteSession(db, entity, now, transaction), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return result;
@@ -29,7 +30,7 @@ public sealed class PublicationWriteScope(BlogDbContext db) : IPublicationWriteS
         .Where(p => p.Id == publicationId).Select(p => new PublicationAccess(p.Id, p.AuthorId, p.State == PublicationState.Published, p.DeletedAt != null, p.Version)).SingleOrDefaultAsync(ct);
 }
 
-internal sealed class PublicationWriteSession(BlogDbContext db, Publication entity, DateTimeOffset now) : IPublicationWriteSession
+internal sealed class PublicationWriteSession(BlogDbContext db, Publication entity, DateTimeOffset now, IDbContextTransaction transaction) : IPublicationWriteSession
 {
     internal Publication Entity => entity;
     public PublicationAccess Publication => new(entity.Id, entity.AuthorId, entity.State == PublicationState.Published, entity.DeletedAt is not null, entity.Version);
@@ -37,6 +38,6 @@ internal sealed class PublicationWriteSession(BlogDbContext db, Publication enti
     public async Task AdjustCountersAsync(CounterDelta delta, CancellationToken ct)
     {
         if (!Publication.Published || Publication.Deleted) { throw new DomainError("resource_not_found"); }
-        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE publishing.publications SET like_count = like_count + {delta.Likes}, view_count = view_count + {delta.Views} WHERE id = {entity.Id}", ct);
+        await PublicationCounterWriter.AdjustAsync(db, entity, delta, transaction, ct);
     }
 }

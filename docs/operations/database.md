@@ -6,7 +6,7 @@ Use four separately provisioned PostgreSQL principals per installation:
 | --- | --- |
 | owner | NOLOGIN owner of schemas/tables; no application credential |
 | migration | Protected deployment login, member of owner; run migrations with `SET ROLE owner` |
-| runtime | API login: SELECT/INSERT LocalUser, SELECT assignments, Publishing DML, comments SELECT/INSERT/UPDATE and likes SELECT; no role writes or DDL |
+| runtime | API login: SELECT/INSERT LocalUser, SELECT assignments, Publishing DML, comments SELECT/INSERT/UPDATE and likes SELECT/INSERT/DELETE; no role writes or DDL |
 | operator | Separate console login: SELECT LocalUser/assignments/audit, INSERT/DELETE assignments, INSERT audit |
 
 Provision logins through the installation's protected secret mechanism. They must be
@@ -48,8 +48,8 @@ migration and then apply permissions.sql before starting the new API. The previo
 API remains compatible with the additive schema during rollout.
 
 Runtime can SELECT/INSERT/UPDATE publications (terminal deletion uses a tombstone),
-and SELECT/INSERT/UPDATE/DELETE taxonomy and classification. It only SELECTs likes
-in this phase. Operator has no access to Publishing/Engagement. New schemas/tables
+and SELECT/INSERT/UPDATE/DELETE taxonomy and classification. Likes use only
+SELECT/INSERT/DELETE; UPDATE is deliberately absent. Operator has no access to Publishing/Engagement. New schemas/tables
 receive no implicit grants. Local role administration is described in [roles.md](roles.md).
 
 Review the generated AddPublishing SQL and take a protected backup before deployment.
@@ -86,3 +86,12 @@ migration and a verified protected backup. Review the generated SQL in
 `artifacts/validation/us4-migration.sql` before rollout. Constraint, index, query-plan
 and acceptance evidence is stored in `artifacts/validation/us4.json` and
 `artifacts/validation/queries/us4-tree.json`.
+
+US6 adds no schema objects: the existing likes primary key, foreign keys, bigint
+counter CHECK and popularity index already support desired-state writes. Rerun
+permissions.sql with deployment credentials before deploying the API to grant
+runtime INSERT/DELETE on engagement.likes. The script's REVOKE/GRANT transaction
+briefly takes privilege/catalog locks; it does not rewrite content. Deploy the
+executable after this step. Older API versions remain compatible with the schema
+and grants. Executable rollback preserves existing likes/counters; no destructive
+migration or data cleanup is required. Operator still has no Engagement access.

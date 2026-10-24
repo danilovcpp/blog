@@ -1,4 +1,4 @@
-using BlogEngine.Core.ReadModels;
+using BlogEngine.Core.Publishing.Contracts;
 
 namespace BlogEngine.Api.Contracts.Reading;
 

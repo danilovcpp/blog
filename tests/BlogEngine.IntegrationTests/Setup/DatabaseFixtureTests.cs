@@ -19,6 +19,14 @@ public sealed class DatabaseFixtureTests(PostgresFixture postgres) : IClassFixtu
         await using var isolated = CreateContext(second.ConnectionString);
 
         Assert.NotSame(writer.Database.GetDbConnection(), reader.Database.GetDbConnection());
+        await writer.Database.OpenConnectionAsync(cancellationToken);
+        await reader.Database.OpenConnectionAsync(cancellationToken);
+        var writerPid = await writer.Database.SqlQueryRaw<int>("SELECT pg_backend_pid() AS \"Value\"").SingleAsync(cancellationToken);
+        var readerPid = await reader.Database.SqlQueryRaw<int>("SELECT pg_backend_pid() AS \"Value\"").SingleAsync(cancellationToken);
+        Assert.NotEqual(writerPid, readerPid);
+        await writer.Database.CloseConnectionAsync();
+        await writer.Database.OpenConnectionAsync(cancellationToken);
+        Assert.Equal(writerPid, await writer.Database.SqlQueryRaw<int>("SELECT pg_backend_pid() AS \"Value\"").SingleAsync(cancellationToken));
         Assert.Equal(["20261024000000_FixtureProbe"], await reader.Database.GetAppliedMigrationsAsync(cancellationToken));
         await writer.Database.ExecuteSqlRawAsync("INSERT INTO fixture_probe (id) VALUES (1)", cancellationToken);
         Assert.Equal(1, await reader.Database.SqlQueryRaw<int>("SELECT count(*)::int AS \"Value\" FROM fixture_probe").SingleAsync(cancellationToken));

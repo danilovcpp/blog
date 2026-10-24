@@ -30,8 +30,8 @@ GRANT USAGE ON SCHEMA publishing, engagement, discussions TO :"runtime_role";
 GRANT SELECT, INSERT, UPDATE ON publishing.publications TO :"runtime_role";
 GRANT SELECT, INSERT, UPDATE, DELETE ON publishing.categories, publishing.tags,
     publishing.publication_categories, publishing.publication_tags TO :"runtime_role";
--- Like mutation is a later phase. Public detail only reads the existing relation.
-GRANT SELECT ON engagement.likes TO :"runtime_role";
+-- Likes have only desired-state insert/delete operations; runtime cannot rewrite identity or creation time.
+GRANT SELECT, INSERT, DELETE ON engagement.likes TO :"runtime_role";
 -- Comments are terminal tombstones; runtime never physically deletes a node.
 GRANT SELECT, INSERT, UPDATE ON discussions.comments TO :"runtime_role";
 -- New objects receive no implicit runtime/operator grants. Extend this file with the owning migration.

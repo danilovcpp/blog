@@ -39,7 +39,9 @@ public sealed class PostgresFixture : IAsyncLifetime
         var connectionString = new NpgsqlConnectionStringBuilder(adminConnectionString)
         {
             Database = databaseName,
-            Pooling = false,
+            // Reuse sequential connections so repeated 100-way HTTP scenarios do not exhaust
+            // the host's ephemeral TCP ports. Simultaneous contexts still rent separate connections.
+            Pooling = true,
             Timezone = "UTC",
         }.ConnectionString;
         var database = new PostgresDatabase(connectionString, adminConnectionString, databaseName);
@@ -98,6 +100,9 @@ public sealed class PostgresDatabase : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        // Close this isolated database's idle pool before dropping it; active connections close on return.
+        using var databasePool = new NpgsqlConnection(ConnectionString);
+        NpgsqlConnection.ClearPool(databasePool);
         await using var admin = new NpgsqlConnection(adminConnectionString);
         await admin.OpenAsync(timeout.Token);
         await using var command = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)", admin);

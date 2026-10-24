@@ -46,6 +46,9 @@ public sealed class FoundationHealthTests(PostgresFixture postgres) : IClassFixt
             await disable.ExecuteNonQueryAsync(ct);
             try
             {
+                // ALLOW_CONNECTIONS rejects new sessions; end the idle pooled session to model a full outage.
+                using var pool = new NpgsqlConnection(database.ConnectionString);
+                NpgsqlConnection.ClearPool(pool);
                 using var down = await client.GetAsync("/health/ready", ct);
                 await InfrastructureContractTests.AssertProblem(down, 503, "dependency_unavailable");
             }

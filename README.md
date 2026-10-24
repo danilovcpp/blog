@@ -2,7 +2,7 @@
 
 ## Blog Engine: Publishing, Reading, Accounts, Discussions and Moderation MVP
 
-Реализованы Phase 1–7 (T001–T091) из
+Реализованы Phase 1–8 (T001–T099) из
 [`tasks.md`](specs/001-blog-engine-mvp/tasks.md): общие правила Core, Accounts,
 миграции Accounts/Publishing/Discussions, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
 API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и Swagger UI включены
@@ -71,7 +71,24 @@ Moderator/Admin получают `GET /api/v1/moderation/comments` с необя
 Moderator не может переписывать/удалять чужие комментарии. Все ответы модерации — `no-store`.
 SQL/EXPLAIN 16 вариантов списка на 6000 комментариях сохраняются в
 `artifacts/validation/queries/us5-moderation.json`, обоснование индексов — в
-`artifacts/validation/us5-queries.md`. Запись лайков остаётся в следующей фазе US6.
+`artifacts/validation/us5-queries.md`.
+
+Reader ставит и снимает собственный лайк через bodyless PUT/DELETE
+`/api/v1/publications/{id}/like` с обязательным Bearer. Оба метода возвращают
+200 с `{ likeCount, viewCount, isLikedByCurrentUser }` и `Cache-Control: no-store`.
+Повтор желаемого состояния успешен без дополнительной дельты; `X-Resource-Version`
+не требуется. Закрытый/удалённый/отсутствующий материал даёт 404 для любой роли.
+Источник лайка и bigint-счётчик изменяются атомарно под блокировкой публикации;
+лайки не меняют edit version, даты или контент. Popular order сразу отражает записи,
+а личное состояние в feed/detail/counters изолировано по проверенному пользователю.
+Истории лайков и публичного списка поставивших лайк нет.
+
+Перед deployment US6 повторно примените `ops/database/permissions.sql`: runtime
+нужны SELECT/INSERT/DELETE на `engagement.likes`; UPDATE и права Operator на
+Engagement отсутствуют. Новых миграций нет. Проверки двух hosts, 100 одновременных
+PUT одной пары, смешанных операций 100 пользователей, гонок с закрытием и откатов
+сохраняют отчёты `artifacts/validation/us6-likes.json`, `us6-concurrency.md` и
+`queries/us6-reads.json`. Учёт просмотров остаётся в следующей фазе US7.
 
 ### Требования и сборка
 
@@ -93,7 +110,12 @@ dotnet test tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj
 
 CI повторяет эти проверки на Linux. Недоступность Docker/БД, пустой suite или
 пропущенные тесты означают ошибку. Результаты тестов сохраняются в игнорируемом
-`artifacts/`. На машине с ограниченными правами Docker-тестам нужен разрешённый
+`artifacts/`. Интеграционный runner запускает максимум четыре test collections
+одновременно, ограничивая число стартующих PostgreSQL-контейнеров на многоядерных
+машинах. Внутри concurrency-сценариев сохраняются все 100 одновременных запросов.
+Последовательные подключения используют pool изолированной БД; одновременные
+DbContext получают разные PostgreSQL connections. Pool закрывается при удалении БД.
+На машине с ограниченными правами Docker-тестам нужен разрешённый
 доступ к engine. При повторном использовании MSBuild server из другой среды
 можно добавить `--disable-build-servers -m:1` к команде сборки.
 

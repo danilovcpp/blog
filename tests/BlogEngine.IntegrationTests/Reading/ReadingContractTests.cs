@@ -125,6 +125,9 @@ public sealed class ReadingContractTests(PostgresFixture postgres) : IClassFixtu
     internal static async Task<JsonElement> GetAsync(HttpClient client, string path, CancellationToken ct)
     {
         using var response = await client.GetAsync(path, ct); AssertPrivate(response);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode); return await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        Assert.True(response.StatusCode == HttpStatusCode.OK,
+            $"GET {path}: {(int)response.StatusCode}; code={(result.TryGetProperty("code", out var code) ? code.GetString() : "absent")}");
+        return result;
     }
 }

@@ -39,6 +39,7 @@ app.MapFeedEndpoints();
 app.MapCounterEndpoints();
 app.MapCommentEndpoints();
 app.MapModerationEndpoints();
+app.MapLikeEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();

@@ -25,4 +25,12 @@ public readonly record struct CounterDelta
     }
     public int Likes { get; }
     public int Views { get; }
+
+    public (long Likes, long Views) Apply(long likes, long views)
+    {
+        var result = (Likes: checked(likes + Likes), Views: checked(views + Views));
+        if (likes < 0 || views < 0 || result.Likes < 0 || result.Views < 0)
+        { throw new InvalidOperationException("Publication counters cannot be negative."); }
+        return result;
+    }
 }

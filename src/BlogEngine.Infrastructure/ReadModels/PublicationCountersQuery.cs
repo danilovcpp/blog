@@ -1,5 +1,5 @@
+using BlogEngine.Core.Publishing.Contracts;
 using BlogEngine.Core.Publishing.Domain;
-using BlogEngine.Core.ReadModels;
 using BlogEngine.Core.Shared;
 using BlogEngine.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
