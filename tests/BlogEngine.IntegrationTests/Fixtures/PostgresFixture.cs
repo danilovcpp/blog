@@ -26,10 +26,10 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     public async Task<PostgresDatabase> CreateDatabaseAsync<TContext>(
-        Func<string, TContext> createContext, CancellationToken cancellationToken) where TContext : DbContext
+        Func<string, TContext> createContext, CancellationToken cancellationToken, bool benchmark = false) where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(createContext);
-        var databaseName = "test_" + Guid.NewGuid().ToString("N");
+        var databaseName = (benchmark ? "sc005_disposable_" : "test_") + Guid.NewGuid().ToString("N");
         var adminConnectionString = GetAdminConnectionString();
         await using var admin = new NpgsqlConnection(adminConnectionString);
         await admin.OpenAsync(cancellationToken);
@@ -64,6 +64,19 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     public ValueTask DisposeAsync() => container.DisposeAsync();
+
+    public async Task<PostgresDatabase> CloneDatabaseAsync(PostgresDatabase source, CancellationToken ct)
+    {
+        var sourceName = new NpgsqlConnectionStringBuilder(source.ConnectionString).Database!;
+        if (!sourceName.StartsWith("sc005_disposable_", StringComparison.Ordinal) || sourceName.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_'))
+        { throw new InvalidOperationException("Only a fixture-owned benchmark database can be cloned."); }
+        using var pool = new NpgsqlConnection(source.ConnectionString); NpgsqlConnection.ClearPool(pool);
+        var name = "sc005_disposable_" + Guid.NewGuid().ToString("N");
+        var adminString = GetAdminConnectionString(); await using var admin = new NpgsqlConnection(adminString); await admin.OpenAsync(ct);
+        await using var clone = new NpgsqlCommand($"CREATE DATABASE \"{name}\" TEMPLATE \"{sourceName}\"", admin) { CommandTimeout = 120 };
+        await clone.ExecuteNonQueryAsync(ct);
+        return new PostgresDatabase(new NpgsqlConnectionStringBuilder(source.ConnectionString) { Database = name }.ConnectionString, adminString, name);
+    }
 
     private string GetAdminConnectionString()
     {

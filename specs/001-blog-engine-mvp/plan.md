@@ -4,8 +4,9 @@
 
 **Feature context**: `001-blog-engine-mvp` — значение `BRANCH` setup-plan из имени каталога; это не Git-ветка.
 
-**Status**: Ready for implementation — спецификация, планирование и генерация задач завершены 2026-10-24.
-Реализация не начата; запуск — только по отдельной команде.
+**Status**: Истории Phase 1–9 реализованы; Phase 10 выполняет итоговые gates.
+SC-005 заблокирован отсутствием выделенного стенда. Фактические проверки и статус:
+[implementation-report.md](implementation-report.md).
 
 **Input**: `specs/001-blog-engine-mvp/spec.md`, согласованные Q1–Q3, [исходные ограничения](references/source-constraints.md), Identity 1.1.0, конституция 1.0.0.
 
@@ -95,7 +96,7 @@ specs/001-blog-engine-mvp/
 
 ### Source Code (repository root)
 
-Проектируемая структура реализации; сейчас в репозитории только Spec Kit/документация.
+Структура реализации; итоговые дополнительные файлы проверок перечислены в tasks.md.
 
 ```text
 BlogEngine.slnx

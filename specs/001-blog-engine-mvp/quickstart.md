@@ -6,16 +6,11 @@
 
 ## Статус и предпосылки
 
-Сейчас репозиторий содержит документы проектирования. Приведённые ниже solution,
-проекты, compose-файл, тестовые категории и helper scripts — **контракт будущей
-реализации**, который должен войти в `tasks.md`; они пока не созданы и эти команды
-не заявлены как выполненные. Руководство исполняют после их реализации.
-
-Локально подтверждены .NET SDK 10.0.402 и ASP.NET Core runtime 10.0.13. Docker CLI
-доступен, но чтение engine `desktop-linux` вернуло `permission denied` для pipe
-Docker Desktop. Успешный запуск контейнера, PostgreSQL и интеграционных тестов не
-подтверждён. Перед проверкой нужен доступ к работающему Linux container engine.
-Это не мешает подготовке документов, но блокирует заявление об успешной приёмке кода.
+Solution, API/Operator, миграции, compose, тестовые категории и helper scripts
+реализованы. Фактические исходы команд и оставшиеся gates зафиксированы в
+[implementation-report.md](implementation-report.md). Локальный Docker доступен
+при разрешённом доступе к engine; тесты используют настоящий PostgreSQL 18.6.
+SC-005 остаётся заблокирован отсутствием выделенного стенда R-06.
 
 Нужны PowerShell 7, Git, SDK из `global.json`, доступ к NuGet при первом restore,
 Docker Compose и возможность получить закреплённый `postgres:18.6` с digest,
@@ -54,7 +49,7 @@ dotnet test tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj
 
 ## Локальный API и отдельные права БД
 
-Будущий `compose.yaml` запускает только локальный PostgreSQL и получает bootstrap
+`compose.yaml` запускает только локальный PostgreSQL и получает bootstrap
 credentials через защищённое окружение оператора; секреты не записываются в Git.
 Миграционная учётная запись имеет DDL, API — только необходимый DML и SELECT
 повышенных ролей, Operator — ограниченную запись назначений и аудита без DDL.
@@ -267,11 +262,14 @@ PostgreSQL 8 vCPU/16 GiB/NVMe SSD, генератор 2 vCPU/4 GiB, сеть ≥
 `scripts/performance/Invoke-ReadBenchmark.ps1` поддерживают `Seed` и `Run`:
 
 ```powershell
-$env:BLOG_BENCHMARK_SEED_CONNECTION = Read-Host 'Seed DML connection string только одноразового benchmark PostgreSQL'
+$env:BLOG_BENCHMARK_SEED_CONNECTION = Read-Host 'Seed DML+MAINTAIN connection string только одноразового benchmark PostgreSQL'
+$env:BLOG_BENCHMARK_POSTGRES_IMAGE = Read-Host 'Фактический образ PG18.6 с проверенным @sha256 digest'
+$env:BLOG_BENCHMARK_DISPOSABLE_DATABASE = Read-Host 'Точное имя пустой sc005_disposable_ БД, предварительно мигрированной оператором'
 $env:BLOG_BENCHMARK_API_URL = Read-Host 'URL API выделенного benchmark стенда'
 $env:BLOG_BENCHMARK_FIXTURE_ISSUER = Read-Host 'Фиксированный issuer изолированной benchmark JWKS fixture'
 $env:BLOG_BENCHMARK_FIXTURE_AUDIENCE = Read-Host 'Фиксированный audience этой fixture'
 $env:BLOG_BENCHMARK_FIXTURE_JWKS_URL = Read-Host 'Доверенный адрес публичного JWKS listener этой fixture'
+$env:BLOG_BENCHMARK_FIXTURE_LISTEN_URL = Read-Host 'Локальный URL привязки listener; public JWKS URL доступен API через HTTPS ingress'
 try {
     pwsh -File scripts/performance/Invoke-ReadBenchmark.ps1 -Mode Seed -Seed 20261024 -OutputDirectory artifacts/performance/sc-005
     if ($LASTEXITCODE -ne 0) { throw 'Benchmark seed не проверен' }
@@ -280,6 +278,7 @@ try {
 }
 finally {
     Remove-Item Env:BLOG_BENCHMARK_SEED_CONNECTION -ErrorAction SilentlyContinue
+    Remove-Item Env:BLOG_BENCHMARK_DISPOSABLE_DATABASE -ErrorAction SilentlyContinue
 }
 ```
 
@@ -291,6 +290,42 @@ Run запускает изолированный JWKS listener внутри per
 не отдельный production host. В отчёт входят только публичные fixture settings;
 ключи/JWT/connection strings не выводятся. Нужные роли и LocalUser подготовлены
 seed. Для нагрузочного чтения JWKS refresh не зависит от живого Identity.
+
+Seed требует точного совпадения имени с `BLOG_BENCHMARK_DISPOSABLE_DATABASE`
+и префикса `sc005_disposable_`. Непустая БД принимается только с прежним
+`seed-manifest.json`, совпадающими canonical checksums и schema/corpus/issuer.
+Неизвестные данные не удаляются. Все пути отчётов передаются без секретов.
+Seed principal имеет DML, SELECT migration history и MAINTAIN для ANALYZE
+одноразовых таблиц. API credential для этой операции не используется.
+`-Diagnostic` у wrapper выполняет короткую техническую проверку (1 s + 2 s),
+всегда возвращает ненулевой exit code и не подтверждает SC-005.
+
+До приёмочного Run разместите в OutputDirectory `stand-evidence.json`.
+Поля `api`, `postgres`, `generator` содержат `os="linux-x64"`, точные `vCpu`
+4/8/2 и `memoryGiB` 8/16/4 соответственно, `dedicated=true`, реальный `imageDigest`
+и массив `metrics` с не менее 600 секундными замерами `at` (UTC), `cpuSeconds`, `residentBytes`,
+`ioBytes`. Дополнительно нужны `postgres.nvme=true`, `networkGbps>=1`,
+`apiReplicas=1`, `noOtherLoad=true`. Сбор этих показателей на выделенных hosts
+выполняет мониторинг стенда; generator также сохраняет собственные process/proc
+замеры. Отсутствующая/неподходящая evidence запрещает exit 0. Файл не должен
+содержать credentials, tokens или environment dump. Это проверяемое evidence
+окружения, его нельзя заполнять предположениями о локальном Docker.
+Wrapper копирует SQL evidence из `-QueryEvidenceDirectory` (по умолчанию
+`artifacts/validation/queries`) в `OutputDirectory/queries`. Run проверяет
+полноту/hash файлов SQL/планов, status, canonical data/schema checksums и PG settings
+против seed manifest. Evidence другой схемы/данных/настроек или отсутствующие планы
+запрещают exit 0. Для приёмки планы собирают с проверяемыми настройками PostgreSQL.
+
+Полный seed и query inspection исполняются автоматическим тестом
+`FullDatasetQueryTests`: он создаёт одноразовую БД и отдельную expanded copy,
+проверяет повторную генерацию и удаляет только свои fixture БД. Для этого нужен
+свободный диск под несколько GiB данных и время до 20 минут. Команды:
+
+```powershell
+pwsh -File scripts/validation/Invoke-MigrationValidation.ps1
+pwsh -File scripts/validation/Invoke-QueryInspection.ps1
+dotnet test tests/BlogEngine.IntegrationTests -c Release --filter 'FullyQualifiedName~ConsumerWalkthroughTests|FullyQualifiedName~OpenApiCompatibilityTests'
+```
 
 **Контракт Seed**: реализовать нормативный
 [профиль SC-005](spec.md#приёмочный-профиль-sc-005) `sc005-v1`: 100 000 Published,

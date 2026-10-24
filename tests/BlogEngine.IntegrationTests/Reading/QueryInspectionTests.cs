@@ -80,7 +80,7 @@ public sealed class QueryInspectionTests(PostgresFixture postgres) : IClassFixtu
         }), ct);
     }
 
-    private static NpgsqlCommand Command(NpgsqlConnection connection, ReadingCommand recorded, string prefix = "")
+    internal static NpgsqlCommand Command(NpgsqlConnection connection, ReadingCommand recorded, string prefix = "")
     {
         var command = new NpgsqlCommand(prefix + recorded.Sql, connection);
         foreach (var parameter in recorded.Parameters)
@@ -88,6 +88,6 @@ public sealed class QueryInspectionTests(PostgresFixture postgres) : IClassFixtu
         return command;
     }
 
-    private static string ParameterType(NpgsqlParameter parameter) => (parameter.NpgsqlDbType & NpgsqlDbType.Array) != 0 ?
+    internal static string ParameterType(NpgsqlParameter parameter) => (parameter.NpgsqlDbType & NpgsqlDbType.Array) != 0 ?
         (parameter.NpgsqlDbType & ~NpgsqlDbType.Array) + "[]" : parameter.NpgsqlDbType.ToString();
 }

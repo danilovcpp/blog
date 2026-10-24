@@ -76,7 +76,7 @@ public sealed class ViewConfigurationTests(PostgresFixture postgres) : IClassFix
         Assert.Equal("registerView", operation.GetProperty("operationId").GetString()); Assert.False(operation.TryGetProperty("requestBody", out _));
         Assert.Equal(2, operation.GetProperty("security").GetArrayLength());
         Assert.Contains(operation.GetProperty("parameters").EnumerateArray(), p => p.GetProperty("name").GetString() == "X-Anonymous-Visitor");
-        var schema = document.GetProperty("components").GetProperty("schemas").GetProperty("ViewResultDto");
+        var schema = document.GetProperty("components").GetProperty("schemas").GetProperty("ViewResult");
         Assert.Equal(3, schema.GetProperty("required").GetArrayLength()); Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
     }
 

@@ -1,8 +1,8 @@
 # blog
 
-## Blog Engine: Publishing, Reading, Accounts, Discussions and Moderation MVP
+## Blog Engine: MVP и итоговые проверки
 
-Реализованы Phase 1–8 (T001–T099) из
+Реализованы истории Phase 1–9 (T001–T113) из
 [`tasks.md`](specs/001-blog-engine-mvp/tasks.md): общие правила Core, Accounts,
 миграции Accounts/Publishing/Discussions, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
 API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и Swagger UI включены
@@ -37,7 +37,11 @@ Markdown. Публичные content-ответы используют `private,
 Повышенные роли выдаёт отдельный Operator: users find, roles list/grant/revoke с
 атомарным неизменяемым аудитом, в том числе для no-op. Порядок первого Admin,
 exit codes и проверка неизвестного commit описаны в [roles.md](docs/operations/roles.md).
-Performance harness пока возвращает 2.
+Итоговая Phase 10 добавляет consumer walkthrough всех 35 операций,
+сравнение OpenAPI с нормативным YAML, миграционные/эксплуатационные gates,
+детерминированный seed и нагрузочный harness. SC-005 требует выделенного Linux
+стенда и пока заблокирован его отсутствием; локальные тесты не подтверждают p95/p99.
+Точный статус задач и проверки — в [implementation-report.md](specs/001-blog-engine-mvp/implementation-report.md).
 
 Обсуждение Published-материала доступно через
 `GET /api/v1/publications/{id}/comments`: без `parentId` возвращаются корни,

@@ -1,5 +1,14 @@
 # Database principals and migrations
 
+Final validation: run `pwsh -File scripts/validation/Invoke-MigrationValidation.ps1`
+from the repository root. It creates isolated PostgreSQL 18.6 fixtures, upgrades
+every real baseline with representative rows, replays idempotent SQL, checks
+constraints/privileges/model drift, and writes reviewed SQL/TRX under
+`artifacts/validation/migrations/`. It never targets a configured production DB.
+Full dataset SQL/EXPLAIN and taxonomy-copy checks use
+`scripts/validation/Invoke-QueryInspection.ps1`. Rollout, backups, locks and recovery
+are described in [deployment.md](deployment.md).
+
 Use four separately provisioned PostgreSQL principals per installation:
 
 | Principal | Purpose |
@@ -16,7 +25,7 @@ or one another. Credentials never belong in Git, shell arguments or reports.
 
 `ops/database/permissions.sql` uses psql identifier variables `owner_role`,
 `migration_role`, `runtime_role`, `operator_role`. Run it as the database provisioner
-after applying AddDiscussions. It changes ownership and grants only on existing
+after applying the complete reviewed chain (currently AddViewDeduplication). It changes ownership and grants only on existing
 Accounts/Publishing/Engagement/Discussions objects, revokes PUBLIC schema/database creation and temporary-table privileges,
 and gives no elevated application roles. Use a dedicated database; pre-existing grants
 or other memberships must be removed during provisioning. Run the script after each

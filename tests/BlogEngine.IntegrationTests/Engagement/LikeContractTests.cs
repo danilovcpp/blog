@@ -195,7 +195,7 @@ public sealed class LikeContractTests(PostgresFixture postgres) : IClassFixture<
             Assert.DoesNotContain(operation.GetProperty("parameters").EnumerateArray(), p => p.GetProperty("name").GetString() == "X-Resource-Version");
             foreach (var status in new[] { "200", "400", "401", "403", "404", "500", "503" }) { Assert.True(operation.GetProperty("responses").TryGetProperty(status, out _)); }
         }
-        var schema = document.GetProperty("components").GetProperty("schemas").GetProperty("CountersDto");
+        var schema = document.GetProperty("components").GetProperty("schemas").GetProperty("Counters");
         Assert.Equal(3, schema.GetProperty("required").GetArrayLength()); Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
     }
 }

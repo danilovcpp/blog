@@ -483,6 +483,11 @@
         "resolved": "5.0.0",
         "contentHash": "dDoKi0PnDz31yAyETfRntsLArTlVAVzUzCIvvEDsDsucrl33Dl8pIJG06ePTJTI3tGpeyHS9Cq7Foc/s4EeKcg=="
       },
+      "SharpYaml": {
+        "type": "Transitive",
+        "resolved": "2.1.5",
+        "contentHash": "1pNSpfXxNAgCQ9sacKKpEWO2DxTefoLEjw0v1nWMvyJScUWacoHvjXr4LfcUkhm0qYgNYripFFiUeEzW4tdXIQ=="
+      },
       "SharpZipLib": {
         "type": "Transitive",
         "resolved": "1.4.2",
@@ -589,6 +594,7 @@
           "BlogEngine.Infrastructure": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.13, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.13, )",
+          "Microsoft.OpenApi.YamlReader": "[2.12.2, )",
           "Swashbuckle.AspNetCore.SwaggerUI": "[10.3.1, )"
         }
       },
@@ -612,6 +618,13 @@
           "BlogEngine.Core": "[1.0.0, )",
           "BlogEngine.Infrastructure": "[1.0.0, )",
           "Microsoft.Extensions.Hosting": "[10.0.13, )"
+        }
+      },
+      "blogengine.performance": {
+        "type": "Project",
+        "dependencies": {
+          "BlogEngine.Core": "[1.0.0, )",
+          "BlogEngine.Infrastructure": "[1.0.0, )"
         }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
@@ -693,6 +706,16 @@
         "contentHash": "ui3fuBT4fs8kdKfBthI4NzLYIBIneEVS8UrL1JVBzAn80UiKmngBBi0BEByE7n/9c+EElcfFlCMFFTqpkBSLNA==",
         "dependencies": {
           "Microsoft.IdentityModel.Tokens": "8.19.2"
+        }
+      },
+      "Microsoft.OpenApi.YamlReader": {
+        "type": "CentralTransitive",
+        "requested": "[2.12.2, )",
+        "resolved": "2.12.2",
+        "contentHash": "ppHZ/+lgwdrQPyZA0ws0BsKqGc713+xL9BhpqwmP3scbWLg6GSWJQD6BX6dts7C/7QDwat4cbCGGGLMOPgvzQw==",
+        "dependencies": {
+          "Microsoft.OpenApi": "2.12.2",
+          "SharpYaml": "2.1.5"
         }
       },
       "Npgsql": {

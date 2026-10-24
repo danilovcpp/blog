@@ -7,10 +7,12 @@
     <ProjectReference Include="../BlogEngine.Infrastructure/BlogEngine.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.OpenApi.YamlReader" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../specs/001-blog-engine-mvp/contracts/openapi.yaml" LogicalName="BlogEngine.Api.openapi.yaml" />
     <Folder Include="Endpoints/" />
     <Folder Include="Contracts/" />
     <Folder Include="Configuration/" />

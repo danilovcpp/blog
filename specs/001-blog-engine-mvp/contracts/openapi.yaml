@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Blog Engine MVP
   version: 1.0.0
-  description: 'Phase 1 normative contract, not an implemented service. Backend for one project. Supplemental security/operator/visibility
+  description: 'Normative consumer contract. Backend for one project. Supplemental security/operator/visibility
     rules: operations.md. All dates UTC. Input lengths count Unicode scalars after documented trim; Markdown limit
     counts UTF-8 bytes. Request bodies <=8MiB, unknown fields rejected; GET/command methods without requestBody
     must not send a body. All errors ProblemDetails. Public requests may carry Bearer for personalization; a supplied
@@ -1850,25 +1850,24 @@ components:
       description: Private owner/Admin projection for a Published parent. Own Hidden content is null; Admin sees
         retained Hidden text. Deleted content is always null. A new version is retrieved here before owner deletion
         of Hidden content.
-      allOf:
-      - if:
-          properties:
-            state:
-              const: Visible
-        then:
-          properties:
-            content:
-              type: string
-              minLength: 1
-              maxLength: 5000
-      - if:
-          properties:
-            state:
-              const: Deleted
-        then:
-          properties:
-            content:
-              type: 'null'
+      oneOf:
+      - properties:
+          state:
+            const: Visible
+          content:
+            type: string
+            minLength: 1
+            maxLength: 5000
+      - properties:
+          state:
+            const: Hidden
+          content:
+            type: [string, 'null']
+      - properties:
+          state:
+            const: Deleted
+          content:
+            type: 'null'
     ModerationComment:
       type: object
       additionalProperties: false
@@ -1925,25 +1924,26 @@ components:
       - version
       description: Moderator/Admin only; Published parents. Hidden text/author retained here, Deleted text null.
         Never a public DTO.
-      allOf:
-      - if:
-          properties:
-            state:
-              const: Visible
-        then:
-          properties:
-            content:
-              type: string
-              minLength: 1
-              maxLength: 5000
-      - if:
-          properties:
-            state:
-              const: Deleted
-        then:
-          properties:
-            content:
-              type: 'null'
+      oneOf:
+      - properties:
+          state:
+            const: Visible
+          content:
+            type: string
+            minLength: 1
+            maxLength: 5000
+      - properties:
+          state:
+            const: Hidden
+          content:
+            type: string
+            minLength: 1
+            maxLength: 5000
+      - properties:
+          state:
+            const: Deleted
+          content:
+            type: 'null'
     ViewResult:
       type: object
       additionalProperties: false
@@ -2120,6 +2120,7 @@ components:
       - hasNextPage
   responses:
     Error400:
+      headers: *id001
       description: validation_failed or invalid_request; field errors for invalid values, unknown fields or malformed
         JSON.
       content:
@@ -2138,25 +2139,31 @@ components:
           schema:
             type: string
           description: Bearer challenge without sensitive error details.
+        Cache-Control: *id003
+        Vary: *id004
     Error403:
+      headers: *id001
       description: forbidden; verified identity lacks permission.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Error404:
+      headers: *id001
       description: resource_not_found; absent or inaccessible resource. Draft/deleted public lookups are indistinguishable.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Error409:
+      headers: *id001
       description: concurrency_conflict, slug_conflict, taxonomy_in_use or invalid_state; no overwrite/partial write.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Error413:
+      headers: *id001
       description: request_too_large; global JSON body limit 8 MiB. Decoded field-size violations are400 validation_failed
         unless the global envelope is exceeded.
       content:
@@ -2164,18 +2171,21 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     Error415:
+      headers: *id001
       description: unsupported_media_type; request body must be application/json.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Error500:
+      headers: *id001
       description: internal_error; safe details and traceId.
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Error503:
+      headers: *id001
       description: dependency_unavailable for database/infrastructure failure; identity_keys_unavailable when a
         required JWKS fetch cannot provide a usable key. Fail closed.
       content:

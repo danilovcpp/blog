@@ -111,7 +111,7 @@ public sealed class DiscussionContractTests(PostgresFixture postgres) : IClassFi
         var document = await JsonAsync(await f.Anonymous.GetAsync("/openapi/v1.json", ct), HttpStatusCode.OK, ct);
         await File.WriteAllTextAsync(ArtifactPath("us4-openapi.json"), document.GetRawText(), ct);
         var schemas = document.GetProperty("components").GetProperty("schemas");
-        var publicSchema = schemas.GetProperty("PublicCommentDto");
+        var publicSchema = schemas.GetProperty("PublicComment");
         Assert.False(publicSchema.TryGetProperty("discriminator", out _));
         Assert.Equal(2, publicSchema.GetProperty("oneOf").GetArrayLength());
         foreach (var reference in publicSchema.GetProperty("oneOf").EnumerateArray())
@@ -119,11 +119,11 @@ public sealed class DiscussionContractTests(PostgresFixture postgres) : IClassFi
             var name = reference.GetProperty("$ref").GetString()!.Split('/')[^1];
             var shape = schemas.GetProperty(name); var properties = shape.GetProperty("properties");
             Assert.False(properties.TryGetProperty("version", out _)); Assert.Contains("state", shape.GetProperty("required").EnumerateArray().Select(x => x.GetString()));
-            if (name.EndsWith("CommentPlaceholderDto", StringComparison.Ordinal))
+            if (name == "CommentPlaceholder")
             { Assert.Equal("null", properties.GetProperty("content").GetProperty("type").GetString()); Assert.Equal("null", properties.GetProperty("author").GetProperty("type").GetString()); }
         }
-        Assert.True(schemas.GetProperty("CommentEditContextDto").GetProperty("properties").TryGetProperty("version", out _));
-        Assert.Equal(3, schemas.GetProperty("CommentEditContextDto").GetProperty("oneOf").GetArrayLength());
+        Assert.True(schemas.GetProperty("CommentEditContext").GetProperty("properties").TryGetProperty("version", out _));
+        Assert.Equal(3, schemas.GetProperty("CommentEditContext").GetProperty("oneOf").GetArrayLength());
         var post = document.GetProperty("paths").GetProperty("/api/v1/publications/{id}/comments").GetProperty("post");
         Assert.True(post.GetProperty("responses").GetProperty("201").TryGetProperty("content", out _));
     }

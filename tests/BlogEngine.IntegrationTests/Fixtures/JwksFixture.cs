@@ -29,13 +29,14 @@ public sealed class JwksFixture : IAsyncLifetime, IDisposable
     public Task? ResponseGate { get; set; }
     public string ResponseBody { get { lock (sync) { return response; } } }
 
-    public JwksFixture()
+    public JwksFixture(string? issuer = null)
     {
+        Issuer = issuer ?? "urn:blog-engine:test:" + Guid.NewGuid().ToString("N");
         ResetResponse();
     }
 
     public AdjustableTimeProvider Time { get; } = new(DateTimeOffset.UtcNow);
-    public string Issuer { get; } = "urn:blog-engine:test:" + Guid.NewGuid().ToString("N");
+    public string Issuer { get; }
     public string Audience => "blog-engine-tests";
     public Uri JwksUrl => jwksUrl ?? throw new InvalidOperationException("Initialize the JWKS fixture first.");
     public int RequestCount => Volatile.Read(ref requestCount);

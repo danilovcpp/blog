@@ -23,7 +23,8 @@ public sealed class LifecycleContractTests(PostgresFixture postgres) : IClassFix
         var admin = await f.ActorAsync(LocalRole.Admin, ct);
         var moderator = await f.ActorAsync(LocalRole.Moderator, ct);
         using var creation = await author.PostAsJsonAsync("/api/v1/publications", Content(markdown: ""), ct);
-        Assert.Equal("no-store", creation.Headers.CacheControl?.ToString());
+        Assert.True(creation.Headers.CacheControl?.NoStore);
+        Assert.True(creation.Headers.CacheControl?.Private);
         Assert.StartsWith("/api/v1/workspace/publications/", creation.Headers.Location?.OriginalString);
         var draft = await JsonAsync(creation, HttpStatusCode.Created, ct);
         var id = draft.GetProperty("id").GetGuid(); var path = "/api/v1/publications/" + id;

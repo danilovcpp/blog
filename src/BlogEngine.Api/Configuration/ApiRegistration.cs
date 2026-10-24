@@ -1,8 +1,6 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using BlogEngine.Api.Contracts.Discussions;
-using BlogEngine.Api.Contracts.Reading;
 using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Discussions.Application;
 using BlogEngine.Core.Discussions.Contracts;
@@ -108,10 +106,7 @@ public static class ApiRegistration
             services.AddOpenApi(options =>
             {
                 options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
-                options.AddDocumentTransformer(CommentSchemas.TransformAsync);
-                options.AddDocumentTransformer(ModerationOpenApi.TransformAsync);
-                options.AddDocumentTransformer(LikeOpenApi.TransformAsync);
-                options.AddDocumentTransformer(BlogEngine.Api.Contracts.Engagement.ViewOpenApi.TransformAsync);
+                options.AddDocumentTransformer(OpenApiContract.TransformAsync);
             });
         }
         // Framework SQL/auth diagnostics can contain request data. The boundary writes safe structured events.
@@ -125,15 +120,13 @@ public static class ApiRegistration
     public static async Task ValidateOptionalBearerAsync(HttpContext context, RequestDelegate next)
     {
         var optional = context.GetEndpoint()?.Metadata.GetMetadata<OptionalBearerContent>() is not null;
-        var protectedEndpoint = context.GetEndpoint() is { } endpoint && endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null;
         context.Response.OnStarting(() =>
         {
-            if (optional)
+            if (context.GetEndpoint() is not null)
             {
                 context.Response.Headers.CacheControl = "private, no-store";
                 context.Response.Headers.Append("Vary", "Authorization");
             }
-            else if (protectedEndpoint) { context.Response.Headers.CacheControl = "no-store"; }
             return Task.CompletedTask;
         });
         if (context.Request.Headers.ContainsKey("Authorization") && context.User.Identity?.IsAuthenticated != true)

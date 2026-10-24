@@ -171,7 +171,7 @@ public sealed class ModerationContractTests(PostgresFixture postgres) : IClassFi
         var ct = TestContext.Current.CancellationToken; await using var f = await StartAsync(postgres, ct);
         var document = await JsonAsync(await f.Anonymous.GetAsync("/openapi/v1.json", ct), HttpStatusCode.OK, ct);
         await File.WriteAllTextAsync(ArtifactPath("us5-openapi.json"), document.GetRawText(), ct);
-        var schema = document.GetProperty("components").GetProperty("schemas").GetProperty("ModerationCommentDto");
+        var schema = document.GetProperty("components").GetProperty("schemas").GetProperty("ModerationComment");
         Assert.False(schema.GetProperty("additionalProperties").GetBoolean()); Assert.Equal(10, schema.GetProperty("required").GetArrayLength());
         Assert.Equal(3, schema.GetProperty("oneOf").GetArrayLength());
         foreach (var (path, method) in new[] { (ListPath, "get"), ("/api/v1/comments/{commentId}/hide", "post"), ("/api/v1/comments/{commentId}/restore", "post") })

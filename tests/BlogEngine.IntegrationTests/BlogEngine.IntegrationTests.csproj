@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/BlogEngine.Api/BlogEngine.Api.csproj" />
     <ProjectReference Include="../../src/BlogEngine.Operator/BlogEngine.Operator.csproj" />
+    <ProjectReference Include="../BlogEngine.Performance/BlogEngine.Performance.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="xunit.v3.mtp-off" />

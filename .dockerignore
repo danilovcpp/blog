@@ -21,3 +21,17 @@ secrets/
 .idea/
 Dockerfile*
 .dockerignore
+.specify/
+.aws/
+.ssh/
+.azure/
+.kube/
+**/node_modules/
+.env*
+**/.env*
+**/*.local.json
+**/*.log*
+**/*.key
+**/*.pfx
+**/*.p12
+**/Dockerfile*
