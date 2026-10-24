@@ -1,13 +1,24 @@
 # blog
 
-## Blog Engine: Foundational
+## Blog Engine: Publishing MVP
 
-Реализованы Phase 1 и Phase 2 (T001–T028) из
+Реализованы Phase 1–3 (T001–T046) из
 [`tasks.md`](specs/001-blog-engine-mvp/tasks.md): общие правила Core, Accounts,
-начальная миграция, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
+миграции Accounts/Publishing, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
 API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и Swagger UI включены
-только в Development. Продуктовые endpoints и команды Operator появятся в следующих
-фазах. Operator проверяет свою конфигурацию (код 5 при ошибке), неизвестная команда
+только в Development. Author/Admin могут создавать Draft, редактировать, публиковать,
+снимать с публикации и удалять материалы через `/api/v1/publications` и workspace
+`/api/v1/workspace/publications`. Категории и теги доступны для публичного чтения,
+изменять их может Admin. Опубликованный материал читается по ID или
+`/api/v1/publications/by-slug/{slug}`. Markdown возвращается как недоверенный source;
+движок не рендерит HTML и не загружает обложки. GET не учитывает просмотры.
+
+Для изменения существующего ресурса нужен `X-Resource-Version` из workspace/taxonomy DTO;
+устаревшая версия даёт 409. Slug неизменен после первой публикации и остаётся занят
+после удаления. Public detail не содержит edit version/state; workspace list не содержит
+Markdown. Публичные content-ответы используют `private, no-store`/`Vary: Authorization`.
+Повышенные роли для автоматических проверок создаёт изолированная fixture.
+Команды Operator появятся в US3. Operator проверяет свою конфигурацию (код 5 при ошибке), неизвестная команда
 возвращает 2. Performance harness пока возвращает 2.
 
 ### Требования и сборка
@@ -63,7 +74,7 @@ Bootstrap credentials Compose предназначены для локально
 API — необходимый DML и SELECT ролей, Operator — ограниченная запись ролей/аудита,
 миграции — отдельный deployment-шаг с DDL. Runtime hosts не применяют миграции.
 Создание principals и применение ограниченных grants описаны в
-[`database.md`](docs/operations/database.md); скрипт для существующих Accounts-таблиц —
+[`database.md`](docs/operations/database.md); скрипт для Accounts/Publishing/likes-таблиц —
 [`permissions.sql`](ops/database/permissions.sql). Operator пока имеет только чтение
 Accounts; назначение ролей и аудит входят в US3.
 

@@ -1,7 +1,6 @@
-using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Shared;
 
-namespace BlogEngine.Core.Accounts.Application;
+namespace BlogEngine.Core.Accounts.Contracts;
 
 public enum ActorAction { Interact, CreatePublication, ManageTaxonomy, ModerateComments }
 

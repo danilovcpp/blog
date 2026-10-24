@@ -2,9 +2,13 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BlogEngine.Core.Accounts.Contracts;
+using BlogEngine.Core.Publishing.Application;
+using BlogEngine.Core.Publishing.Contracts;
 using BlogEngine.Infrastructure.Identity;
 using BlogEngine.Infrastructure.Persistence;
 using BlogEngine.Infrastructure.Persistence.Accounts;
+using BlogEngine.Infrastructure.Persistence.Publishing;
+using BlogEngine.Infrastructure.ReadModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +34,15 @@ public static class ApiRegistration
         services.AddScoped<IActorResolver, ActorResolver>();
         services.AddScoped<CurrentActorAccessor>();
         services.AddScoped<DependencyReadiness>();
+        services.AddScoped<IPublicationWriteScope, PublicationWriteScope>();
+        services.AddScoped<IPublicationReader, PublicationWriteScope>();
+        services.AddScoped<IPublicationStore, PublicationStore>();
+        services.AddScoped<ITaxonomyStore, TaxonomyStore>();
+        services.AddScoped<PublicationService>();
+        services.AddScoped<TaxonomyService>();
+        services.AddScoped<WorkspaceQueries>();
+        services.AddScoped<TaxonomyQueries>();
+        services.AddScoped<PublicationDetailQuery>();
         services.AddSingleton(provider => new JwksSettings(new Uri(provider.GetRequiredService<IOptions<IdentityOptions>>().Value.JwksUrl)));
         services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
         {

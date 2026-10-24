@@ -15,6 +15,10 @@ public static class DatabaseErrorMapper
         // Do not infer business conflicts from arbitrary SQLSTATEs; add each named constraint with its owning migration.
         if (cause is PostgresException postgres)
         {
+            if (postgres.SqlState == "23505" && postgres.ConstraintName is "uq_publications_slug" or "uq_categories_slug" or "uq_tags_slug")
+            { return new DomainError("slug_conflict"); }
+            if (postgres.SqlState is "23503" or "23001" && postgres.ConstraintName is "fk_publication_categories_categories" or "fk_publication_tags_tags")
+            { return new DomainError("taxonomy_in_use"); }
             return postgres.SqlState.StartsWith("08", StringComparison.Ordinal) || postgres.SqlState is "57P01" or "57P02" or "57P03" or "53300" or "55000" or "28000" or "28P01" or "3D000"
                 ? new DomainError("dependency_unavailable") : null;
         }

@@ -76,6 +76,262 @@ namespace BlogEngine.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlogEngine.Core.Engagement.Domain.Like", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("PublicationId", "UserId")
+                        .HasName("pk_likes");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_likes_user_id");
+
+                    b.ToTable("likes", "engagement");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Category", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name")
+                        .UseCollation("C");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("slug");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_categories");
+
+                    b.HasAlternateKey("Slug")
+                        .HasName("uq_categories_slug");
+
+                    b.HasIndex("Name", "Id")
+                        .HasDatabaseName("ix_categories_name_id");
+
+                    b.ToTable("categories", "publishing", t =>
+                        {
+                            t.HasCheckConstraint("ck_categories_name", "name = btrim(name, U&'\\0009\\000a\\000b\\000c\\000d\\0020\\0085\\00a0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200a\\2028\\2029\\202f\\205f\\3000') AND char_length(name) BETWEEN 1 AND 80");
+
+                            t.HasCheckConstraint("ck_categories_slug", "char_length(slug) BETWEEN 1 AND 120 AND slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Publication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<string>("CoverUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("cover_url");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<DateTimeOffset?>("FirstPublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_published_at");
+
+                    b.Property<long>("LikeCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("like_count");
+
+                    b.Property<string>("Markdown")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("markdown");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("slug");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.Property<long>("ViewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("view_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_publications");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("uq_publications_slug");
+
+                    b.HasIndex("FirstPublishedAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_publications_recent")
+                        .HasFilter("state = 1 AND deleted_at IS NULL");
+
+                    b.HasIndex("UpdatedAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_publications_workspace_admin")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("AuthorId", "UpdatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_publications_workspace_author")
+                        .HasFilter("deleted_at IS NULL");
+
+                    b.HasIndex("LikeCount", "FirstPublishedAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_publications_popular")
+                        .HasFilter("state = 1 AND deleted_at IS NULL");
+
+                    b.ToTable("publications", "publishing", t =>
+                        {
+                            t.HasCheckConstraint("ck_publications_counters", "like_count >= 0 AND view_count >= 0");
+
+                            t.HasCheckConstraint("ck_publications_cover_url", "cover_url IS NULL OR (char_length(cover_url) BETWEEN 1 AND 2048 AND cover_url ~* '^https://')");
+
+                            t.HasCheckConstraint("ck_publications_description", "description IS NULL OR char_length(description) <= 500");
+
+                            t.HasCheckConstraint("ck_publications_markdown", "octet_length(markdown) <= 1048576");
+
+                            t.HasCheckConstraint("ck_publications_published", "state <> 1 OR (first_published_at IS NOT NULL AND char_length(btrim(markdown, U&'\\0009\\000a\\000b\\000c\\000d\\0020\\0085\\00a0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200a\\2028\\2029\\202f\\205f\\3000')) > 0)");
+
+                            t.HasCheckConstraint("ck_publications_slug", "char_length(slug) BETWEEN 1 AND 120 AND slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'");
+
+                            t.HasCheckConstraint("ck_publications_state", "state IN (0, 1)");
+
+                            t.HasCheckConstraint("ck_publications_title", "title = btrim(title, U&'\\0009\\000a\\000b\\000c\\000d\\0020\\0085\\00a0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200a\\2028\\2029\\202f\\205f\\3000') AND char_length(title) BETWEEN 1 AND 200");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.PublicationCategory", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.HasKey("PublicationId", "CategoryId")
+                        .HasName("pk_publication_categories");
+
+                    b.HasIndex("CategoryId", "PublicationId")
+                        .HasDatabaseName("ix_publication_categories_reverse");
+
+                    b.ToTable("publication_categories", "publishing");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.PublicationTag", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publication_id");
+
+                    b.Property<Guid>("TagId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tag_id");
+
+                    b.HasKey("PublicationId", "TagId")
+                        .HasName("pk_publication_tags");
+
+                    b.HasIndex("TagId", "PublicationId")
+                        .HasDatabaseName("ix_publication_tags_reverse");
+
+                    b.ToTable("publication_tags", "publishing");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Tag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name")
+                        .UseCollation("C");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("slug");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tags");
+
+                    b.HasAlternateKey("Slug")
+                        .HasName("uq_tags_slug");
+
+                    b.HasIndex("Name", "Id")
+                        .HasDatabaseName("ix_tags_name_id");
+
+                    b.ToTable("tags", "publishing", t =>
+                        {
+                            t.HasCheckConstraint("ck_tags_name", "name = btrim(name, U&'\\0009\\000a\\000b\\000c\\000d\\0020\\0085\\00a0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200a\\2028\\2029\\202f\\205f\\3000') AND char_length(name) BETWEEN 1 AND 80");
+
+                            t.HasCheckConstraint("ck_tags_slug", "char_length(slug) BETWEEN 1 AND 120 AND slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'");
+                        });
+                });
+
             modelBuilder.Entity("BlogEngine.Core.Accounts.Domain.RoleAssignment", b =>
                 {
                     b.HasOne("BlogEngine.Core.Accounts.Domain.LocalUser", null)
@@ -84,6 +340,67 @@ namespace BlogEngine.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_role_assignments_local_users");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Engagement.Domain.Like", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Publishing.Domain.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_likes_publications");
+
+                    b.HasOne("BlogEngine.Core.Accounts.Domain.LocalUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_likes_local_users");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Publication", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Accounts.Domain.LocalUser", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_publications_local_users");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.PublicationCategory", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Publishing.Domain.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_publication_categories_categories");
+
+                    b.HasOne("BlogEngine.Core.Publishing.Domain.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_publication_categories_publications");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.PublicationTag", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Publishing.Domain.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_publication_tags_publications");
+
+                    b.HasOne("BlogEngine.Core.Publishing.Domain.Tag", null)
+                        .WithMany()
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_publication_tags_tags");
                 });
 #pragma warning restore 612, 618
         }

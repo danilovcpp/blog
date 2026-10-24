@@ -1,6 +1,6 @@
 using BlogEngine.Api.Configuration;
 using BlogEngine.Api.Contracts;
-using BlogEngine.Core.Accounts.Application;
+using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Shared;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

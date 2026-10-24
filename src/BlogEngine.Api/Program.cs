@@ -30,6 +30,10 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 app.UseMiddleware<RequestContractValidation>();
 app.MapHealthEndpoints();
+app.MapPublicationCommandEndpoints();
+app.MapWorkspaceEndpoints();
+app.MapTaxonomyEndpoints();
+app.MapPublicationReadEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();

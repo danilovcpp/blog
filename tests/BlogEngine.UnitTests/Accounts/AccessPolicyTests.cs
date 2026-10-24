@@ -1,4 +1,3 @@
-using BlogEngine.Core.Accounts.Application;
 using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Accounts.Domain;
 using BlogEngine.Core.Shared;
