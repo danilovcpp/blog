@@ -16,6 +16,6 @@ public sealed class LikeConfiguration : IEntityTypeConfiguration<Like>
         b.HasOne<Publication>().WithMany().HasForeignKey(x => x.PublicationId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_likes_publications");
         b.HasOne<LocalUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_likes_local_users");
         b.HasIndex(x => x.UserId).HasDatabaseName("ix_likes_user_id");
-        PublishingSql.Columns(b);
+        PersistenceSql.Columns(b);
     }
 }

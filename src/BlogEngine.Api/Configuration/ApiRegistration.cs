@@ -1,13 +1,17 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BlogEngine.Api.Contracts.Discussions;
 using BlogEngine.Core.Accounts.Contracts;
+using BlogEngine.Core.Discussions.Application;
+using BlogEngine.Core.Discussions.Contracts;
 using BlogEngine.Core.Publishing.Application;
 using BlogEngine.Core.Publishing.Contracts;
 using BlogEngine.Core.ReadModels;
 using BlogEngine.Infrastructure.Identity;
 using BlogEngine.Infrastructure.Persistence;
 using BlogEngine.Infrastructure.Persistence.Accounts;
+using BlogEngine.Infrastructure.Persistence.Discussions;
 using BlogEngine.Infrastructure.Persistence.Publishing;
 using BlogEngine.Infrastructure.ReadModels;
 using Microsoft.AspNetCore.Authentication;
@@ -46,6 +50,10 @@ public static class ApiRegistration
         services.AddScoped<PublicationDetailQuery>();
         services.AddScoped<IPublicFeedReader, PublicFeedQuery>();
         services.AddScoped<PublicationCountersQuery>();
+        services.AddScoped<ICommentWriteStore, CommentWriteStore>();
+        services.AddScoped<CommentService>();
+        services.AddScoped<ICommentReader, CommentTreeQuery>();
+        services.AddScoped<CommentEditQuery>();
         services.AddSingleton(provider => new JwksSettings(new Uri(provider.GetRequiredService<IOptions<IdentityOptions>>().Value.JwksUrl)));
         services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
         {
@@ -74,7 +82,11 @@ public static class ApiRegistration
             cors.AddDefaultPolicy(policy => policy.WithOrigins(api.Value.AllowedOrigins).AllowAnyHeader().AllowAnyMethod()));
         if (builder.Environment.IsDevelopment())
         {
-            services.AddOpenApi(options => options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1);
+            services.AddOpenApi(options =>
+            {
+                options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
+                options.AddDocumentTransformer(CommentSchemas.TransformAsync);
+            });
         }
         // Framework SQL/auth diagnostics can contain request data. The boundary writes safe structured events.
         builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);

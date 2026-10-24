@@ -1,7 +1,9 @@
 using BlogEngine.Core.Accounts.Domain;
+using BlogEngine.Core.Discussions.Domain;
 using BlogEngine.Core.Engagement.Domain;
 using BlogEngine.Core.Publishing.Domain;
 using BlogEngine.Infrastructure.Persistence.Accounts;
+using BlogEngine.Infrastructure.Persistence.Discussions;
 using BlogEngine.Infrastructure.Persistence.Engagement;
 using BlogEngine.Infrastructure.Persistence.Publishing;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +21,7 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
     public DbSet<PublicationCategory> PublicationCategories => Set<PublicationCategory>();
     public DbSet<PublicationTag> PublicationTags => Set<PublicationTag>();
     public DbSet<Like> Likes => Set<Like>();
+    public DbSet<Comment> Comments => Set<Comment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,5 +34,6 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
         modelBuilder.ApplyConfiguration<PublicationCategory>(new ClassificationConfiguration());
         modelBuilder.ApplyConfiguration<PublicationTag>(new ClassificationConfiguration());
         modelBuilder.ApplyConfiguration(new LikeConfiguration());
+        modelBuilder.ApplyConfiguration(new CommentConfiguration());
     }
 }

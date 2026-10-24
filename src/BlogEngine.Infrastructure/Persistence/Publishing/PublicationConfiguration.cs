@@ -1,6 +1,5 @@
 using BlogEngine.Core.Accounts.Domain;
 using BlogEngine.Core.Publishing.Domain;
-using BlogEngine.Core.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -8,16 +7,7 @@ namespace BlogEngine.Infrastructure.Persistence.Publishing;
 
 internal static class PublishingSql
 {
-    public static string Trim(string column) => $"btrim({column}, U&'{string.Concat(TextRules.WhiteSpace.Select(c => "\\" + ((int)c).ToString("x4", System.Globalization.CultureInfo.InvariantCulture)))}')";
     public const string SlugCheck = "char_length(slug) BETWEEN 1 AND 120 AND slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'";
-    public static void Columns<T>(EntityTypeBuilder<T> builder) where T : class
-    {
-        foreach (var property in builder.Metadata.GetProperties())
-        {
-            var name = string.Concat(property.Name.Select((c, i) => char.IsUpper(c) && i > 0 ? "_" + char.ToLowerInvariant(c) : char.ToLowerInvariant(c).ToString()));
-            property.SetColumnName(name);
-        }
-    }
 }
 
 public sealed class PublicationConfiguration : IEntityTypeConfiguration<Publication>
@@ -26,13 +16,13 @@ public sealed class PublicationConfiguration : IEntityTypeConfiguration<Publicat
     {
         b.ToTable("publications", "publishing", table =>
         {
-            table.HasCheckConstraint("ck_publications_title", $"title = {PublishingSql.Trim("title")} AND char_length(title) BETWEEN 1 AND 200");
+            table.HasCheckConstraint("ck_publications_title", $"title = {PersistenceSql.Trim("title")} AND char_length(title) BETWEEN 1 AND 200");
             table.HasCheckConstraint("ck_publications_slug", PublishingSql.SlugCheck);
             table.HasCheckConstraint("ck_publications_markdown", "octet_length(markdown) <= 1048576");
             table.HasCheckConstraint("ck_publications_description", "description IS NULL OR char_length(description) <= 500");
             table.HasCheckConstraint("ck_publications_cover_url", "cover_url IS NULL OR (char_length(cover_url) BETWEEN 1 AND 2048 AND cover_url ~* '^https://')");
             table.HasCheckConstraint("ck_publications_state", "state IN (0, 1)");
-            table.HasCheckConstraint("ck_publications_published", $"state <> 1 OR (first_published_at IS NOT NULL AND char_length({PublishingSql.Trim("markdown")}) > 0)");
+            table.HasCheckConstraint("ck_publications_published", $"state <> 1 OR (first_published_at IS NOT NULL AND char_length({PersistenceSql.Trim("markdown")}) > 0)");
             table.HasCheckConstraint("ck_publications_counters", "like_count >= 0 AND view_count >= 0");
         });
         b.HasKey(p => p.Id).HasName("pk_publications");
@@ -47,6 +37,6 @@ public sealed class PublicationConfiguration : IEntityTypeConfiguration<Publicat
         b.HasIndex(p => new { p.LikeCount, p.FirstPublishedAt, p.Id }).IsDescending().HasFilter("state = 1 AND deleted_at IS NULL").HasDatabaseName("ix_publications_popular");
         b.HasIndex(p => new { p.AuthorId, p.UpdatedAt, p.Id }).IsDescending(false, true, true).HasFilter("deleted_at IS NULL").HasDatabaseName("ix_publications_workspace_author");
         b.HasIndex(p => new { p.UpdatedAt, p.Id }).IsDescending().HasFilter("deleted_at IS NULL").HasDatabaseName("ix_publications_workspace_admin");
-        PublishingSql.Columns(b);
+        PersistenceSql.Columns(b);
     }
 }

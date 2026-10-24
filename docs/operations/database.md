@@ -6,7 +6,7 @@ Use four separately provisioned PostgreSQL principals per installation:
 | --- | --- |
 | owner | NOLOGIN owner of schemas/tables; no application credential |
 | migration | Protected deployment login, member of owner; run migrations with `SET ROLE owner` |
-| runtime | API login: SELECT/INSERT LocalUser, SELECT assignments, Publishing DML and likes SELECT; no role writes or DDL |
+| runtime | API login: SELECT/INSERT LocalUser, SELECT assignments, Publishing DML, comments SELECT/INSERT/UPDATE and likes SELECT; no role writes or DDL |
 | operator | Separate console login: SELECT LocalUser/assignments/audit, INSERT/DELETE assignments, INSERT audit |
 
 Provision logins through the installation's protected secret mechanism. They must be
@@ -16,8 +16,8 @@ or one another. Credentials never belong in Git, shell arguments or reports.
 
 `ops/database/permissions.sql` uses psql identifier variables `owner_role`,
 `migration_role`, `runtime_role`, `operator_role`. Run it as the database provisioner
-after applying AddRoleChangeAudit. It changes ownership and grants only on existing
-Accounts/Publishing/Engagement objects, revokes PUBLIC schema/database creation and temporary-table privileges,
+after applying AddDiscussions. It changes ownership and grants only on existing
+Accounts/Publishing/Engagement/Discussions objects, revokes PUBLIC schema/database creation and temporary-table privileges,
 and gives no elevated application roles. Use a dedicated database; pre-existing grants
 or other memberships must be removed during provisioning. Run the script after each
 migration whose tables require new grants. Operator has no content, DDL or audit
@@ -69,3 +69,20 @@ require schema rollback. Down drops all role audit history and is destructive on
 commands have run. Production recovery keeps the additive schema or uses a reviewed
 corrective migration and verified protected backup. Use Down/reapply only on
 disposable test databases. Runtime and Operator never apply migrations themselves.
+
+AddDiscussions adds the comments table and its integrity constraints/indexes. The
+composite parent FK prevents cross-publication links; parent depth and immutable
+links are checked under the existing publication row lock. New-table DDL and FK
+validation briefly lock the referenced Accounts/Publishing objects; no existing
+content is rewritten. Empty-schema application and upgrade from AddRoleChangeAudit
+preserving an existing user are covered by PostgreSQL tests. Apply the migration,
+then permissions.sql, before deploying the API. Runtime can SELECT/INSERT/UPDATE
+comments, without physical DELETE; Operator has no Discussions privileges.
+
+The previous API remains compatible with the additive schema. Down destroys all
+discussion content and is only for disposable databases. Production rollback keeps
+the additive schema with the previous executable, or uses a reviewed corrective
+migration and a verified protected backup. Review the generated SQL in
+`artifacts/validation/us4-migration.sql` before rollout. Constraint, index, query-plan
+and acceptance evidence is stored in `artifacts/validation/us4.json` and
+`artifacts/validation/queries/us4-tree.json`.

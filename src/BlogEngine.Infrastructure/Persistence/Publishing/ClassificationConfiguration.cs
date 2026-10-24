@@ -13,7 +13,7 @@ public sealed class ClassificationConfiguration : IEntityTypeConfiguration<Publi
         b.HasOne<Publication>().WithMany().HasForeignKey(x => x.PublicationId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_publication_categories_publications");
         b.HasOne<Category>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_publication_categories_categories");
         b.HasIndex(x => new { x.CategoryId, x.PublicationId }).HasDatabaseName("ix_publication_categories_reverse");
-        PublishingSql.Columns(b);
+        PersistenceSql.Columns(b);
     }
     public void Configure(EntityTypeBuilder<PublicationTag> b)
     {
@@ -22,6 +22,6 @@ public sealed class ClassificationConfiguration : IEntityTypeConfiguration<Publi
         b.HasOne<Publication>().WithMany().HasForeignKey(x => x.PublicationId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_publication_tags_publications");
         b.HasOne<Tag>().WithMany().HasForeignKey(x => x.TagId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_publication_tags_tags");
         b.HasIndex(x => new { x.TagId, x.PublicationId }).HasDatabaseName("ix_publication_tags_reverse");
-        PublishingSql.Columns(b);
+        PersistenceSql.Columns(b);
     }
 }

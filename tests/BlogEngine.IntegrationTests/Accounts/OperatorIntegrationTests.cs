@@ -205,7 +205,7 @@ public sealed class OperatorIntegrationTests(PostgresFixture postgres) : IClassF
             await apply.ExecuteNonQueryAsync(ct);
             await apply.ExecuteNonQueryAsync(ct);
         }
-        Assert.Equal(3, (await db.Database.GetAppliedMigrationsAsync(ct)).Count());
+        Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(ct));
         var user = new BlogEngine.Core.Accounts.Domain.LocalUser(Guid.NewGuid(), OperatorFixture.Issuer, Guid.NewGuid(), DateTimeOffset.UtcNow);
         db.LocalUsers.Add(user); await db.SaveChangesAsync(ct);
         var correlation = Guid.NewGuid();

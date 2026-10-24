@@ -37,6 +37,7 @@ app.MapTaxonomyEndpoints();
 app.MapPublicationReadEndpoints();
 app.MapFeedEndpoints();
 app.MapCounterEndpoints();
+app.MapCommentEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();

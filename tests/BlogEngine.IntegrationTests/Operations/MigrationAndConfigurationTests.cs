@@ -20,11 +20,11 @@ public sealed class MigrationAndConfigurationTests(PostgresFixture postgres) : I
         await using var database = await postgres.CreateDatabaseAsync(BootstrapTests.Context, ct);
         await using var context = BootstrapTests.Context(database.ConnectionString);
         var migrator = context.GetService<IMigrator>();
-        Assert.Equal(3, (await context.Database.GetAppliedMigrationsAsync(ct)).Count());
+        Assert.Equal(context.Database.GetMigrations(), await context.Database.GetAppliedMigrationsAsync(ct));
         await migrator.MigrateAsync("0", ct);
         Assert.Empty(await context.Database.GetAppliedMigrationsAsync(ct));
         await context.Database.MigrateAsync(ct);
-        Assert.Equal(3, (await context.Database.GetAppliedMigrationsAsync(ct)).Count());
+        Assert.Equal(context.Database.GetMigrations(), await context.Database.GetAppliedMigrationsAsync(ct));
         Assert.False(context.Database.HasPendingModelChanges());
         Assert.Equal(0, await context.LocalUsers.CountAsync(ct));
         var constraints = await context.Database.SqlQueryRaw<string>("""

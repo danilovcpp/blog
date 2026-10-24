@@ -1,10 +1,10 @@
 # blog
 
-## Blog Engine: Publishing and Reading MVP
+## Blog Engine: Publishing, Reading, Accounts and Discussions MVP
 
-Реализованы Phase 1–4 (T001–T056) из
+Реализованы Phase 1–6 (T001–T083) из
 [`tasks.md`](specs/001-blog-engine-mvp/tasks.md): общие правила Core, Accounts,
-миграции Accounts/Publishing, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
+миграции Accounts/Publishing/Discussions, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
 API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и Swagger UI включены
 только в Development. Author/Admin могут создавать Draft, редактировать, публиковать,
 снимать с публикации и удалять материалы через `/api/v1/publications` и workspace
@@ -38,6 +38,24 @@ Markdown. Публичные content-ответы используют `private,
 атомарным неизменяемым аудитом, в том числе для no-op. Порядок первого Admin,
 exit codes и проверка неизвестного commit описаны в [roles.md](docs/operations/roles.md).
 Performance harness пока возвращает 2.
+
+Обсуждение Published-материала доступно через
+`GET /api/v1/publications/{id}/comments`: без `parentId` возвращаются корни,
+с `parentId` — только прямые ответы доступного узла. Порядок `createdAt/id ASC`,
+`page=1`, `pageSize=20` по умолчанию, максимум 100; ответ содержит `hasNextPage`.
+Reader создаёт комментарий через POST того же маршрута с `{ content, parentId? }`.
+Текст — простой недоверенный текст, после Unicode trim 1–5000 scalar values;
+корень имеет глубину 1, максимум — 5. Новые комментарии и правки Visible видны сразу.
+
+`GET /api/v1/comments/{commentId}` возвращает приватный контекст владельцу/Admin.
+PUT с `{ content }` и DELETE требуют `X-Resource-Version` комментария. Владелец
+Hidden получает `content=null` и версию для удаления; редактировать Hidden может
+Admin с сохранением состояния. Удаление необратимо очищает текст, сохраняя ответы;
+повтор с текущей версией успешен без смены версии/дат. Публичные Hidden/Deleted
+с видимыми потомками возвращаются заглушками с `content=null`, `author=null`.
+Узлы без видимых потомков пропускаются. Публичный DTO не содержит edit version.
+Все операции требуют Published-материал, GET не учитывает просмотры.
+Маршруты модерации остаются в следующей фазе US5.
 
 ### Требования и сборка
 
@@ -92,7 +110,7 @@ Bootstrap credentials Compose предназначены для локально
 API — необходимый DML и SELECT ролей, Operator — ограниченная запись ролей/аудита,
 миграции — отдельный deployment-шаг с DDL. Runtime hosts не применяют миграции.
 Создание principals и применение ограниченных grants описаны в
-[`database.md`](docs/operations/database.md); скрипт для Accounts/Publishing/likes-таблиц —
+[`database.md`](docs/operations/database.md); скрипт для Accounts/Publishing/Discussions/likes-таблиц —
 [`permissions.sql`](ops/database/permissions.sql). Operator читает Accounts, меняет
 только назначения и добавляет аудит; API не имеет доступа к аудиту/записи ролей.
 
