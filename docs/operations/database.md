@@ -95,3 +95,14 @@ briefly takes privilege/catalog locks; it does not rewrite content. Deploy the
 executable after this step. Older API versions remain compatible with the schema
 and grants. Executable rollback preserves existing likes/counters; no destructive
 migration or data cleanup is required. Operator still has no Engagement access.
+
+US7 adds AddViewDeduplication: a new Engagement table with composite visitor key,
+RESTRICT publication FK, NOT NULL/kind/key-length constraints and an expiry index.
+It briefly locks the referenced Publishing table for the new FK and does not rewrite
+existing content or counters. Apply the migration with DDL credentials, then rerun
+permissions.sql before deploying the new API. Runtime needs SELECT/INSERT/UPDATE/DELETE
+on this table; Operator has no access. Every API replica also needs the same protected
+visitor key ring. Startup never applies DDL. Down removes active dedup windows while
+preserving counters; keep the additive schema when rolling back the executable to
+preserve those windows. See [anonymous-visitors.md](anonymous-visitors.md) for staged
+key rotation, cleanup timing, limits and the consequences of destructive rollback.

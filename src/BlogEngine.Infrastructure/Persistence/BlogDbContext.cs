@@ -21,6 +21,7 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
     public DbSet<PublicationCategory> PublicationCategories => Set<PublicationCategory>();
     public DbSet<PublicationTag> PublicationTags => Set<PublicationTag>();
     public DbSet<Like> Likes => Set<Like>();
+    public DbSet<ViewDeduplicationRecord> ViewDeduplicationRecords => Set<ViewDeduplicationRecord>();
     public DbSet<Comment> Comments => Set<Comment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -34,6 +35,7 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
         modelBuilder.ApplyConfiguration<PublicationCategory>(new ClassificationConfiguration());
         modelBuilder.ApplyConfiguration<PublicationTag>(new ClassificationConfiguration());
         modelBuilder.ApplyConfiguration(new LikeConfiguration());
+        modelBuilder.ApplyConfiguration(new ViewDeduplicationConfiguration());
         modelBuilder.ApplyConfiguration(new CommentConfiguration());
     }
 }

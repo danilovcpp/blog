@@ -12,12 +12,14 @@ using BlogEngine.Core.Publishing.Application;
 using BlogEngine.Core.Publishing.Contracts;
 using BlogEngine.Core.ReadModels;
 using BlogEngine.Infrastructure.Identity;
+using BlogEngine.Infrastructure.Maintenance;
 using BlogEngine.Infrastructure.Persistence;
 using BlogEngine.Infrastructure.Persistence.Accounts;
 using BlogEngine.Infrastructure.Persistence.Discussions;
 using BlogEngine.Infrastructure.Persistence.Engagement;
 using BlogEngine.Infrastructure.Persistence.Publishing;
 using BlogEngine.Infrastructure.ReadModels;
+using BlogEngine.Infrastructure.Visitors;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +40,15 @@ public static class ApiRegistration
         services.AddOptions<ApiOptions>().BindConfiguration("Api")
             .Configure(options => options.ConnectionString = builder.Configuration.GetConnectionString("Blog") ?? string.Empty).ValidateOnStart();
         services.AddSingleton<IValidateOptions<ApiOptions>, ApiOptionsValidator>();
+        services.AddOptions<AnonymousVisitorOptions>().BindConfiguration("AnonymousVisitors").ValidateOnStart();
+        services.AddSingleton<IValidateOptions<AnonymousVisitorOptions>, AnonymousVisitorOptionsValidator>();
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<AnonymousVisitorOptions>>().Value;
+            return new AnonymousVisitorTokenService(options.ActiveKeyId, options.Keys);
+        });
+        services.AddSingleton<VisitorIdentityResolver>();
+        services.AddSingleton<DatabaseClock>();
         services.AddDbContext<BlogDbContext>((provider, options) => options.UseNpgsql(provider.GetRequiredService<IOptions<ApiOptions>>().Value.ConnectionString,
             database => database.CommandTimeout(5)));
         services.AddScoped<IActorResolver, ActorResolver>();
@@ -62,6 +73,10 @@ public static class ApiRegistration
         services.AddScoped<ModerationQuery>();
         services.AddScoped<ILikeWriteStore, LikeWriteStore>();
         services.AddScoped<LikeService>();
+        services.AddScoped<IViewWriteStore, ViewWriteStore>();
+        services.AddScoped<ViewService>();
+        services.AddScoped<ViewDeduplicationCleanup>();
+        services.AddHostedService<ViewCleanupWorker>();
         services.AddSingleton(provider => new JwksSettings(new Uri(provider.GetRequiredService<IOptions<IdentityOptions>>().Value.JwksUrl)));
         services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
         {
@@ -96,6 +111,7 @@ public static class ApiRegistration
                 options.AddDocumentTransformer(CommentSchemas.TransformAsync);
                 options.AddDocumentTransformer(ModerationOpenApi.TransformAsync);
                 options.AddDocumentTransformer(LikeOpenApi.TransformAsync);
+                options.AddDocumentTransformer(BlogEngine.Api.Contracts.Engagement.ViewOpenApi.TransformAsync);
             });
         }
         // Framework SQL/auth diagnostics can contain request data. The boundary writes safe structured events.

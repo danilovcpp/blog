@@ -88,7 +88,16 @@ Reader ставит и снимает собственный лайк через
 Engagement отсутствуют. Новых миграций нет. Проверки двух hosts, 100 одновременных
 PUT одной пары, смешанных операций 100 пользователей, гонок с закрытием и откатов
 сохраняют отчёты `artifacts/validation/us6-likes.json`, `us6-concurrency.md` и
-`queries/us6-reads.json`. Учёт просмотров остаётся в следующей фазе US7.
+`queries/us6-reads.json`.
+
+Явный bodyless `POST /api/v1/publications/{id}/views` регистрирует открытие Published
+материала с неподвижным окном 24 часа. Анонимный потребитель сохраняет выданный
+`anonymousVisitorId` и передаёт его в `X-Anonymous-Visitor`. Проверенный Bearer имеет
+приоритет на всех устройствах, без объединения анонимной истории. GET ничего не
+записывает. Две реплики используют общую БД и visitor HMAC key ring; очистка каждые
+15 минут удаляет до 500 истёкших dedup-записей, сохраняя накопленный счётчик.
+Перед deployment примените AddViewDeduplication и повторите permissions.sql.
+Настройка, ротация и ограничения отката: [anonymous-visitors.md](docs/operations/anonymous-visitors.md).
 
 ### Требования и сборка
 
@@ -164,7 +173,7 @@ Development, с разными `UserSecretsId` у hosts.
 | API | `ConnectionStrings:Blog`, `Identity:Issuer`, `Identity:Audience`, `Identity:JwksUrl` |
 | API, при локальном HTTP JWKS | `Identity:AllowLocalHttp` (по умолчанию `false`) |
 | API, CORS | `Api:AllowedOrigins` (явный allowlist) |
-| API, будущий учёт просмотров | `AnonymousVisitors:ActiveKeyId`, `AnonymousVisitors:Keys:<keyId>` |
+| API, учёт просмотров (обязательно) | `AnonymousVisitors:ActiveKeyId`, `AnonymousVisitors:Keys:<keyId>` |
 | API, публичный host | `AllowedHosts` (по умолчанию только localhost/127.0.0.1) |
 | Operator | `ConnectionStrings:Blog`, `Identity:Issuer` |
 | Миграционный процесс | Отдельный DDL connection string из защищённой конфигурации |
@@ -172,7 +181,7 @@ Development, с разными `UserSecretsId` у hosts.
 Для env используйте `__` вместо `:`, например `Identity__Issuer`.
 Реальные issuer/audience/JWKS URL предоставляет оператор установки; production JWKS
 использует HTTPS. Visitor HMAC key ring не является RSA-ключом Identity.
-Обязательные параметры соответствующего host проверяются при запуске; visitor key ring — в US7.
+Обязательные параметры соответствующего host, включая visitor key ring API, проверяются при запуске.
 Не указывайте секреты в исходниках, Git, логах, истории shell или отчётах.
 
 ### Изолированные фикстуры

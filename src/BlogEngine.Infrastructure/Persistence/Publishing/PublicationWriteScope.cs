@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlogEngine.Infrastructure.Persistence.Publishing;
 
-public sealed class PublicationWriteScope(BlogDbContext db) : IPublicationWriteScope, IPublicationReader
+public sealed class PublicationWriteScope(BlogDbContext db, DatabaseClock? clock = null) : IPublicationWriteScope, IPublicationReader
 {
     public async Task<T> ExecuteAsync<T>(Guid publicationId, Func<IPublicationWriteSession, CancellationToken, Task<T>> operation, CancellationToken ct)
     {
@@ -16,7 +16,7 @@ public sealed class PublicationWriteScope(BlogDbContext db) : IPublicationWriteS
             ?? throw new DomainError("resource_not_found");
         // Refresh any previously tracked instance only after the lock, including state/version/counters.
         await db.Entry(entity).ReloadAsync(ct);
-        var now = await UtcNowAsync(db, ct);
+        var now = await (clock ?? new DatabaseClock()).ReadAsync(db, ct);
         var result = await operation(new PublicationWriteSession(db, entity, now, transaction), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

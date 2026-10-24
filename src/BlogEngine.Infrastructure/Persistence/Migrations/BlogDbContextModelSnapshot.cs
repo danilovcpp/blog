@@ -254,6 +254,38 @@ namespace BlogEngine.Infrastructure.Persistence.Migrations
                     b.ToTable("likes", "engagement");
                 });
 
+            modelBuilder.Entity("BlogEngine.Core.Engagement.Domain.ViewDeduplicationRecord", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publication_id");
+
+                    b.Property<short>("VisitorKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("visitor_kind");
+
+                    b.Property<byte[]>("VisitorKey")
+                        .HasColumnType("bytea")
+                        .HasColumnName("visitor_key");
+
+                    b.Property<DateTimeOffset>("LastCountedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_counted_at");
+
+                    b.HasKey("PublicationId", "VisitorKind", "VisitorKey")
+                        .HasName("pk_view_deduplication_records");
+
+                    b.HasIndex("LastCountedAt", "PublicationId")
+                        .HasDatabaseName("ix_view_deduplication_expiry");
+
+                    b.ToTable("view_deduplication_records", "engagement", t =>
+                        {
+                            t.HasCheckConstraint("ck_view_deduplication_key", "octet_length(visitor_key) = 32");
+
+                            t.HasCheckConstraint("ck_view_deduplication_kind", "visitor_kind IN (1,2)");
+                        });
+                });
+
             modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -546,6 +578,16 @@ namespace BlogEngine.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_likes_local_users");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Engagement.Domain.ViewDeduplicationRecord", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Publishing.Domain.Publication", null)
+                        .WithMany()
+                        .HasForeignKey("PublicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_view_deduplication_publications");
                 });
 
             modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Publication", b =>
