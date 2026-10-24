@@ -4,6 +4,9 @@
 
 **Feature context**: `001-blog-engine-mvp` — значение `BRANCH` setup-plan из имени каталога; это не Git-ветка.
 
+**Status**: Ready for implementation — спецификация, планирование и генерация задач завершены 2026-10-24.
+Реализация не начата; запуск — только по отдельной команде.
+
 **Input**: `specs/001-blog-engine-mvp/spec.md`, согласованные Q1–Q3, [исходные ограничения](references/source-constraints.md), Identity 1.1.0, конституция 1.0.0.
 
 ## Summary
@@ -36,7 +39,12 @@ WebApplicationFactory 10.0.13, Testcontainers.PostgreSql 4.16.0, реальны�
 
 **Performance Goals**: SC-005: p95 <=1 s, p99 <=2 s, unexpected failures <=1%
 при 100 параллельных читателях/10 min; bounded feed queries без N+1.
-Стенд и распределение запросов зафиксированы в R-06 research/quickstart.
+Стенд и базовые доли запросов зафиксированы в R-06. Нормативный `sc005-v1`
+(seed 20261024, Markdown 70/25/5% по 2/16/128 KiB, 200 categories/2 000 tags,
+точные частоты назначений и 87,5% непустых/12,5% пустых ответов) задан в
+[профиле SC-005](spec.md#приёмочный-профиль-sc-005); алгоритм/квоты и порядок
+измерений — в quickstart. SQL/query count/EXPLAIN проверяются также для
+списков categories/tags из T043 на основном и увеличенном отдельном наборе.
 
 **Constraints**: Markdown <=1 MiB UTF-8; JSON body <=8 MiB; pageSize <=100;
 дерево <=5; 5 категорий/20 тегов; RS256, exact issuer/audience, skew <=30 s;
@@ -55,11 +63,11 @@ PASS означает соответствие проектного решени
 |---|---|---|
 | I. Модульность/независимость | PASS: чистый Core/порты | PASS: граф/владение ниже, Publishing scope, read contracts, четыре проекта с реальными границами |
 | II. Завершённый C# | PASS: async/NRT, без лишних паттернов | PASS: build/format/analyzers в quickstart, единые правила, CancellationToken, без рабочих TODO |
-| III. Данные | PASS: EF/Npgsql/migrations/constraints | PASS: data-model с FK/UNIQUE/CHECK/indexes, locks/version/atomicity, batch reads, миграционные проверки |
+| III. Данные | PASS: EF/Npgsql/migrations/constraints | PASS: data-model с FK/UNIQUE/CHECK/indexes, locks/version/atomicity, batch reads, миграционные проверки; T120 явно проверяет SQL/query count/проекции/EXPLAIN растущих categories/tags |
 | IV. Контракты/безопасность | PASS: DTO/ProblemDetails/JWT/deny-by-default | PASS: OpenAPI/operations с ролями/404/вводом, недоверенным текстом, key cache, CORS/config |
 | V. Проверки | PASS: unit + HTTP/real PG, fixtures | PASS: quickstart/матрица с negative/boundary/concurrent/migration; skip не успех |
 | VI. Эксплуатация | PASS: health/logs/options/timeout, отдельные credentials | PASS: readiness/JWKS, CLI audit, shutdown, protected config, отдельное применение миграций |
-| Технологии/процесс | PASS: поддерживаемый стек/MVP | PASS: pins R-01/R-09, одна major БД, покрытие FR ниже; tasks.md следующей командой |
+| Технологии/процесс | PASS: поддерживаемый стек/MVP | PASS: pins R-01/R-09, одна major БД, покрытие FR ниже; tasks.md сформирован |
 
 Нарушений/исключений из конституции и нерешённых бизнес-вопросов нет. Настройки
 реального Identity — deployment inputs; автоматические тесты используют fixtures.
@@ -72,6 +80,7 @@ PASS означает соответствие проектного решени
 specs/001-blog-engine-mvp/
 ├── spec.md
 ├── plan.md
+├── tasks.md
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
@@ -82,7 +91,7 @@ specs/001-blog-engine-mvp/
 └── checklists/
 ```
 
-`tasks.md` создаётся следующей командой `$speckit-tasks`.
+Генерация [tasks.md](tasks.md) завершена: сформированы 125 задач реализации и проверок.
 
 ### Source Code (repository root)
 
@@ -168,15 +177,15 @@ connection/transaction без независимых commits. Lock order опи�
 анонимный ID, JWKS, CLI и стенд. SDK/runtime доступны; Docker engine недоступен
 текущей сессии по правам. Документацию это не блокирует; PG-тестам потребуется engine.
 
-## Phase 1 — передача в tasks
+## Phase 1 — результат планирования и передачи в tasks
 
-Созданы data-model, OpenAPI, operations и quickstart. Следующая генерация задач
-включает проверки вместе с кодом, миграциями и эксплуатационными файлами.
+Созданы data-model, OpenAPI, operations и quickstart. Генерация `tasks.md` завершена;
+задачи включают проверки вместе с кодом, миграциями и эксплуатационными файлами.
 
 | Требования | Реализация/обязательные проверки |
 |---|---|
 | FR-001–011, SC-001 | lifecycle, slug/first publish, UTF-8/URL/лимиты, assignment/delete races, tombstone uniqueness, версии/rollback; unit + HTTP + DB |
-| FR-012–017, QR-001, SC-005/006 | public/workspace, any/all filters, ties/pages, author refs, SQL <=5/планы, read benchmark |
+| FR-010/012–017, QR-001, SC-005/006 | public/workspace/taxonomy, any/all filters, ties/pages, author refs; feed SQL <=5, taxonomy SQL =1, проекции/EXPLAIN/index evidence T120; read benchmark по sc005-v1 |
 | FR-018–025, SC-002/006 | depth/cross-parent/cycles, корни/дети, hide/restore/delete/ancestor counts, версии, заглушки, parent state races |
 | FR-026–031, SC-003/004 | 100 concurrent likes/views, mixed users, repeat remove, exact 24h, no sliding, auth/anonymous, cleanup race, multi-host общий DB/keyring, rollback |
 | FR-032–038, SC-007 | role/action/ownership matrix, JWT/claims/isolation, JWKS rotation/outage/flood, bootstrap, next-operation roles, CLI/audit/DB privileges |

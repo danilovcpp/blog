@@ -136,6 +136,11 @@
   p99 <=2 s, unexpected failure <=1%, как SC-005. Отдельные сценарии проверяют каждый
   sort/page-size/filter вариант, чтобы общий percentile не скрывал медленный вариант.
   Многорепличная корректность проверяется отдельными конкурентными тестами.
+- **Уточнение приёмки C1/A1**: нормативный набор `sc005-v1`, частоты назначений,
+  размеры Markdown и квоты пустых/непустых результатов заданы в
+  [профиле SC-005](spec.md#приёмочный-профиль-sc-005), генерация/замер — в quickstart.
+  T120 включает SQL/query count/EXPLAIN списков categories/tags из T043;
+  увеличение справочников выполняется только в отдельной копии для query inspection.
 - **Alternatives considered**: запрос связей для каждой карточки, total count на каждой
   странице и выдача Markdown в feed дают лишнюю стоимость; Redis/read replicas пока не нужны.
 - **Sources**: [EF efficient querying](https://learn.microsoft.com/en-us/ef/core/performance/efficient-querying),
