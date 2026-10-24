@@ -13,5 +13,6 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <Using Include="Xunit" />
+    <None Include="../../ops/database/permissions.sql" Link="permissions.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

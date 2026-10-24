@@ -23,6 +23,11 @@ public sealed class JwksFixture : IAsyncLifetime, IDisposable
     private string response = string.Empty;
     private int responseStatus = StatusCodes.Status200OK;
     private int requestCount;
+    public int MaxAgeSeconds { get; set; } = 300;
+    public string? RedirectLocation { get; set; }
+    public TaskCompletionSource? RequestEntered { get; set; }
+    public Task? ResponseGate { get; set; }
+    public string ResponseBody { get { lock (sync) { return response; } } }
 
     public JwksFixture()
     {
@@ -44,6 +49,8 @@ public sealed class JwksFixture : IAsyncLifetime, IDisposable
         server.MapGet("/.well-known/jwks.json", async context =>
         {
             Interlocked.Increment(ref requestCount);
+            RequestEntered?.TrySetResult();
+            if (ResponseGate is { } gate) { await gate.WaitAsync(context.RequestAborted); }
             string body;
             lock (sync)
             {
@@ -52,7 +59,8 @@ public sealed class JwksFixture : IAsyncLifetime, IDisposable
             }
 
             context.Response.ContentType = "application/json";
-            context.Response.Headers.CacheControl = "public, max-age=300";
+            context.Response.Headers.CacheControl = $"public, max-age={MaxAgeSeconds}";
+            if (RedirectLocation is not null) { context.Response.Headers.Location = RedirectLocation; }
             await context.Response.WriteAsync(body, context.RequestAborted);
         });
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -62,29 +70,39 @@ public sealed class JwksFixture : IAsyncLifetime, IDisposable
         jwksUrl = new Uri(new Uri(address), "/.well-known/jwks.json");
     }
 
-    public string CreateToken(Guid? subject = null, string? issuer = null, string? audience = null)
+    public string CreateToken(Guid? subject = null, string? issuer = null, string? audience = null,
+        Action<Dictionary<string, object>>? customize = null)
     {
         lock (sync)
         {
-            var now = Time.GetUtcNow().UtcDateTime;
-            return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+            var now = Time.GetUtcNow().ToUnixTimeSeconds();
+            var claims = new Dictionary<string, object>
             {
-                Issuer = issuer ?? Issuer,
-                Audience = audience ?? Audience,
-                IssuedAt = now,
-                NotBefore = now,
-                Expires = now.AddMinutes(15),
-                TokenType = "JWT",
-                Claims = new Dictionary<string, object>
-                {
-                    ["sub"] = (subject ?? Guid.NewGuid()).ToString(),
-                    ["sid"] = Guid.NewGuid().ToString(),
-                    ["client_id"] = "fixture",
-                    ["jti"] = Guid.NewGuid().ToString(),
-                    ["token_use"] = "access",
-                },
-                SigningCredentials = new SigningCredentials(new RsaSecurityKey(signingRsa) { KeyId = keyId }, SecurityAlgorithms.RsaSha256),
-            });
+                ["iss"] = issuer ?? Issuer,
+                ["aud"] = audience ?? Audience,
+                ["iat"] = now,
+                ["nbf"] = now,
+                ["exp"] = now + 900,
+                ["sub"] = (subject ?? Guid.NewGuid()).ToString(),
+                ["sid"] = Guid.NewGuid().ToString(),
+                ["client_id"] = "fixture",
+                ["jti"] = Guid.NewGuid().ToString(),
+                ["token_use"] = "access",
+            };
+            customize?.Invoke(claims);
+            return CreateRawToken(JsonSerializer.Serialize(claims));
+        }
+    }
+
+    public string CreateRawToken(string payload, Action<Dictionary<string, object>>? customizeHeader = null)
+    {
+        lock (sync)
+        {
+            var header = new Dictionary<string, object> { ["alg"] = "RS256", ["typ"] = "JWT", ["kid"] = keyId };
+            customizeHeader?.Invoke(header);
+            var input = Base64UrlEncoder.Encode(JsonSerializer.Serialize(header)) + "." + Base64UrlEncoder.Encode(payload);
+            return input + "." + Base64UrlEncoder.Encode(signingRsa.SignData(System.Text.Encoding.ASCII.GetBytes(input),
+                HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
         }
     }
 

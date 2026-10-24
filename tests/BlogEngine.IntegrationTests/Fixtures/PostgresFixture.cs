@@ -15,7 +15,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         .WithEnvironment("POSTGRES_INITDB_ARGS", "--encoding=UTF8 --locale=C")
         .WithEnvironment("TZ", "UTC")
         .WithEnvironment("PGTZ", "UTC")
-        .WithCommand(new OverwriteEnumerable<string>(["postgres", "-c", "timezone=UTC"]))
+        .WithCommand(new OverwriteEnumerable<string>(["postgres", "-c", "timezone=UTC", "-c", "max_connections=200"]))
         .Build();
 
     public async ValueTask InitializeAsync()
@@ -30,7 +30,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     {
         ArgumentNullException.ThrowIfNull(createContext);
         var databaseName = "test_" + Guid.NewGuid().ToString("N");
-        var adminConnectionString = container.GetConnectionString();
+        var adminConnectionString = GetAdminConnectionString();
         await using var admin = new NpgsqlConnection(adminConnectionString);
         await admin.OpenAsync(cancellationToken);
         // PostgreSQL identifiers cannot be parameters. This identifier contains only our generated hex.
@@ -62,6 +62,23 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     public ValueTask DisposeAsync() => container.DisposeAsync();
+
+    private string GetAdminConnectionString()
+    {
+        // This isolated password-authenticated server has no Kerberos installation.
+        return new NpgsqlConnectionStringBuilder(container.GetConnectionString()) { GssEncryptionMode = GssEncryptionMode.Disable }.ConnectionString;
+    }
+
+    public async Task ApplyPermissionsAsync(PostgresDatabase database, IReadOnlyDictionary<string, string> roles, CancellationToken cancellationToken)
+    {
+        var target = "/tmp/permissions_" + Guid.NewGuid().ToString("N") + ".sql";
+        await container.CopyAsync(await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "permissions.sql"), cancellationToken),
+            target, ct: cancellationToken);
+        var arguments = new List<string> { "psql", "--username", "fixture_admin", "--dbname", new NpgsqlConnectionStringBuilder(database.ConnectionString).Database!, "--file", target };
+        foreach (var (key, value) in roles) { arguments.AddRange(["--variable", key + "=" + value]); }
+        var result = await container.ExecAsync(arguments, cancellationToken);
+        Assert.True(result.ExitCode == 0, result.Stderr);
+    }
 }
 
 public sealed class PostgresDatabase : IAsyncDisposable

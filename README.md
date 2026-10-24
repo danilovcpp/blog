@@ -1,12 +1,14 @@
 # blog
 
-## Blog Engine: Setup
+## Blog Engine: Foundational
 
-Реализован каркас Phase 1 (T001–T008) из
-[`tasks.md`](specs/001-blog-engine-mvp/tasks.md). Продуктовые endpoints, проверка
-production-конфигурации, модель БД и команды Operator относятся к следующим фазам.
-API сейчас не предоставляет маршрутов; Operator и performance harness завершаются
-с кодом 2 и сообщением о недоступных в Setup командах.
+Реализованы Phase 1 и Phase 2 (T001–T028) из
+[`tasks.md`](specs/001-blog-engine-mvp/tasks.md): общие правила Core, Accounts,
+начальная миграция, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
+API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и Swagger UI включены
+только в Development. Продуктовые endpoints и команды Operator появятся в следующих
+фазах. Operator проверяет свою конфигурацию (код 5 при ошибке), неизвестная команда
+возвращает 2. Performance harness пока возвращает 2.
 
 ### Требования и сборка
 
@@ -60,8 +62,10 @@ Bootstrap credentials Compose предназначены для локально
 **API, Operator и миграции должны использовать разные учётные записи**:
 API — необходимый DML и SELECT ролей, Operator — ограниченная запись ролей/аудита,
 миграции — отдельный deployment-шаг с DDL. Runtime hosts не применяют миграции.
-Создание principals/grants входит в следующие задачи согласно
-[`operations.md`](specs/001-blog-engine-mvp/contracts/operations.md).
+Создание principals и применение ограниченных grants описаны в
+[`database.md`](docs/operations/database.md); скрипт для существующих Accounts-таблиц —
+[`permissions.sql`](ops/database/permissions.sql). Operator пока имеет только чтение
+Accounts; назначение ролей и аудит входят в US3.
 
 ### Конфигурация без секретов
 
@@ -83,7 +87,7 @@ Development, с разными `UserSecretsId` у hosts.
 Для env используйте `__` вместо `:`, например `Identity__Issuer`.
 Реальные issuer/audience/JWKS URL предоставляет оператор установки; production JWKS
 использует HTTPS. Visitor HMAC key ring не является RSA-ключом Identity.
-Валидация обязательной конфигурации появится в T018, visitor key ring — в US7.
+Обязательные параметры соответствующего host проверяются при запуске; visitor key ring — в US7.
 Не указывайте секреты в исходниках, Git, логах, истории shell или отчётах.
 
 ### Изолированные фикстуры
@@ -91,18 +95,32 @@ Development, с разными `UserSecretsId` у hosts.
 `PostgresFixture` создаёт одноразовый контейнер, а для каждого сценария — отдельную
 БД, применяет переданные EF migrations и удаляет БД после проверки. Каждый DbContext
 создаётся отдельно; общие изменяемые данные между тестами отсутствуют. Setup
-проверяет механизм собственной test-only миграцией `FixtureProbe`; production
-`BlogDbContext` и первая миграция Accounts предусмотрены в T016. `EnsureCreated`
+проверяет механизм собственной test-only миграцией `FixtureProbe`; Foundational
+использует production `BlogDbContext` и `InitialAccounts`. `EnsureCreated`
 не используется.
 
 `ApiFactory` запускает реальный API host; `JwksFixture` предоставляет loopback HTTP
 JWKS server, одноразовые RSA/JWT, ротацию и управляемые ответы без живого Identity.
-Setup smoke test подключает настоящий JwtBearer только в тестовом host; production
-аутентификация относится к T019–T021. `AdjustableTimeProvider` управляет наблюдаемым
+HTTP-тесты используют production JwtBearer и async JWKS adapter. Protected probes
+существуют только в тестовом host, без добавления `/me` до US3. `AdjustableTimeProvider` управляет наблюдаемым
 UTC без ожиданий, `ConcurrencyBarrier` синхронизирует операции с ограниченным
 таймаутом и отменой. Подход основан на документации
 [Testcontainers PostgreSQL](https://dotnet.testcontainers.org/modules/postgres/) и
 [ASP.NET Core integration testing](https://learn.microsoft.com/en-us/aspnet/core/test/integration-tests?view=aspnetcore-10.0).
+
+JWKS загружается с единственного настроенного URL без redirects: максимум 256 KiB
+после декодирования и 32 публичных RSA RS256 ключа. Freshness не превышает 300 секунд;
+меньший max-age соблюдается. Параллельная загрузка объединяется, попытки разделены
+30 секундами даже после отказа, общий timeout — 5 секунд. Необходимые недоступные
+ключи дают безопасный 503; непригодный JWT — 401, без анонимного fallback.
+Локальные роли перечитываются для каждой операции. Reader не хранится в таблице.
+Реальный Identity не требуется тестам и не проверен этими фикстурами.
+Ограничение readiness внутренним ingress и восстановление зависимостей описаны в
+[`health.md`](docs/operations/health.md).
+
+Изолированная PostgreSQL-фикстура использует одноразовые парольные credentials и
+`GSS Encryption Mode=Disable`, поскольку тестовый сервер не имеет Kerberos.
+Это исключает попытки GSS negotiation при открытии соединений в Linux runner.
 
 ## Spec Kit
 
