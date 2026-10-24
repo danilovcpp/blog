@@ -44,19 +44,7 @@ public sealed class WorkspaceQueries(BlogDbContext db)
     internal async Task<IReadOnlyList<ClassifiedPublication>> ClassifyAsync(IReadOnlyList<PublicationSnapshot> rows, CancellationToken ct)
     {
         if (rows.Count == 0) { return []; }
-        var ids = rows.Select(x => x.Id).ToArray();
-        var categories = await (from link in db.PublicationCategories.AsNoTracking()
-                                join item in db.Categories on link.CategoryId equals item.Id
-                                where ids.Contains(link.PublicationId)
-                                orderby item.Name, item.Id
-                                select new { link.PublicationId, Item = new TaxonomyItem(item.Id, item.Name, item.Slug, item.Version) }).ToListAsync(ct);
-        var tags = await (from link in db.PublicationTags.AsNoTracking()
-                          join item in db.Tags on link.TagId equals item.Id
-                          where ids.Contains(link.PublicationId)
-                          orderby item.Name, item.Id
-                          select new { link.PublicationId, Item = new TaxonomyItem(item.Id, item.Name, item.Slug, item.Version) }).ToListAsync(ct);
-        var categoryLookup = categories.ToLookup(x => x.PublicationId, x => x.Item);
-        var tagLookup = tags.ToLookup(x => x.PublicationId, x => x.Item);
-        return rows.Select(row => new ClassifiedPublication(row, categoryLookup[row.Id].ToArray(), tagLookup[row.Id].ToArray())).ToArray();
+        var classification = await PublicationClassificationQuery.LoadAsync(db, rows.Select(x => x.Id).ToArray(), ct);
+        return rows.Select(row => new ClassifiedPublication(row, classification.Categories[row.Id].ToArray(), classification.Tags[row.Id].ToArray())).ToArray();
     }
 }

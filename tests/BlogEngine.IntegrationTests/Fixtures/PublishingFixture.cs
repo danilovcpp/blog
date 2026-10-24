@@ -5,6 +5,7 @@ using System.Text.Json;
 using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Accounts.Domain;
 using BlogEngine.IntegrationTests.Accounts;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 
 namespace BlogEngine.IntegrationTests.Fixtures;
@@ -29,7 +30,7 @@ internal sealed class PublishingFixture : IAsyncDisposable
     public Dictionary<string, string> Roles { get; }
     public HttpClient Anonymous { get; }
 
-    public static async Task<PublishingFixture> StartAsync(PostgresFixture postgres, CancellationToken ct)
+    public static async Task<PublishingFixture> StartAsync(PostgresFixture postgres, CancellationToken ct, DbCommandInterceptor? commandInterceptor = null)
     {
         var database = await postgres.CreateDatabaseAsync(BootstrapTests.Context, ct);
         var roles = new[] { "owner_role", "migration_role", "runtime_role", "operator_role" }.ToDictionary(x => x, _ => "pub_" + Guid.NewGuid().ToString("N"));
@@ -46,7 +47,7 @@ internal sealed class PublishingFixture : IAsyncDisposable
         var runtime = new NpgsqlConnectionStringBuilder(database.ConnectionString) { Username = roles["runtime_role"], Password = password }.ConnectionString;
         var identity = new JwksFixture();
         await identity.InitializeAsync();
-        return new(database, identity, new ApiFactory(runtime, identity), roles);
+        return new(database, identity, new ApiFactory(runtime, identity, commandInterceptor), roles);
     }
     private HttpClient Client() { var client = Factory.CreateClient(); clients.Add(client); return client; }
     public async Task<HttpClient> ActorAsync(LocalRole role, CancellationToken ct)

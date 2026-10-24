@@ -1,8 +1,8 @@
 # blog
 
-## Blog Engine: Publishing MVP
+## Blog Engine: Publishing and Reading MVP
 
-Реализованы Phase 1–3 (T001–T046) из
+Реализованы Phase 1–4 (T001–T056) из
 [`tasks.md`](specs/001-blog-engine-mvp/tasks.md): общие правила Core, Accounts,
 миграции Accounts/Publishing, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
 API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и Swagger UI включены
@@ -12,6 +12,22 @@ API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и
 изменять их может Admin. Опубликованный материал читается по ID или
 `/api/v1/publications/by-slug/{slug}`. Markdown возвращается как недоверенный source;
 движок не рендерит HTML и не загружает обложки. GET не учитывает просмотры.
+
+Публичная лента `GET /api/v1/publications` принимает `page` (по умолчанию 1),
+`pageSize` (по умолчанию 20, максимум 100), `sort=recent|popular` (по умолчанию recent)
+и повторяемые `categoryIds`/`tagIds`: хотя бы одна из выбранных категорий и все выбранные
+теги. Максимум 5 категорий и 20 тегов; неизвестные, повторные и неверные ID дают 400.
+Ответ содержит карточки без Markdown и признак `hasNextPage`; допустимая дальняя страница
+пуста. Recent сортирует по первой публикации/ID DESC, popular — по лайкам/первой
+публикации/ID DESC. `GET /api/v1/publications/{id}/counters` возвращает текущие bigint
+счётчики и личный лайк. Лента, detail и counters принимают optional Bearer; плохой JWT
+даёт отказ. Анонимный `isLikedByCurrentUser` всегда false.
+
+Reading-тесты используют неизменный набор из 250 материалов с совпадающими датами,
+лайками двух пользователей, Draft и tombstones. SQL/EXPLAIN 96 вариантов чтения
+сохраняются в `artifacts/validation/queries/us2-*.json`; лента выполняет не более
+5 data-запросов плюс 3 фиксированных auth/bootstrap-запроса при Bearer. Нагрузочная
+приёмка SC-005 остаётся в финальной фазе.
 
 Для изменения существующего ресурса нужен `X-Resource-Version` из workspace/taxonomy DTO;
 устаревшая версия даёт 409. Slug неизменен после первой публикации и остаётся занят

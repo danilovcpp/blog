@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Publishing.Application;
 using BlogEngine.Core.Publishing.Contracts;
+using BlogEngine.Core.ReadModels;
 using BlogEngine.Infrastructure.Identity;
 using BlogEngine.Infrastructure.Persistence;
 using BlogEngine.Infrastructure.Persistence.Accounts;
@@ -43,6 +44,8 @@ public static class ApiRegistration
         services.AddScoped<WorkspaceQueries>();
         services.AddScoped<TaxonomyQueries>();
         services.AddScoped<PublicationDetailQuery>();
+        services.AddScoped<IPublicFeedReader, PublicFeedQuery>();
+        services.AddScoped<PublicationCountersQuery>();
         services.AddSingleton(provider => new JwksSettings(new Uri(provider.GetRequiredService<IOptions<IdentityOptions>>().Value.JwksUrl)));
         services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
         {

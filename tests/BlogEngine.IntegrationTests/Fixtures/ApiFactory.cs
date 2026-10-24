@@ -1,13 +1,16 @@
+using BlogEngine.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace BlogEngine.IntegrationTests.Fixtures;
 
-public sealed class ApiFactory(string connectionString, JwksFixture identity) : WebApplicationFactory<Program>
+public sealed class ApiFactory(string connectionString, JwksFixture identity, DbCommandInterceptor? commandInterceptor = null) : WebApplicationFactory<Program>
 {
     public const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Timeout=1;Command Timeout=1";
     public AdjustableTimeProvider Time => identity.Time;
@@ -28,6 +31,7 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity) : 
             }));
         builder.ConfigureTestServices(services =>
         {
+            if (commandInterceptor is not null) { services.AddDbContext<BlogDbContext>(options => options.AddInterceptors(commandInterceptor)); }
             services.AddSingleton<TimeProvider>(Time);
             services.AddSingleton<IStartupFilter, FoundationProbes>();
         });
