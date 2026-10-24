@@ -1,8 +1,8 @@
 # blog
 
-## Blog Engine: Publishing, Reading, Accounts and Discussions MVP
+## Blog Engine: Publishing, Reading, Accounts, Discussions and Moderation MVP
 
-Реализованы Phase 1–6 (T001–T083) из
+Реализованы Phase 1–7 (T001–T091) из
 [`tasks.md`](specs/001-blog-engine-mvp/tasks.md): общие правила Core, Accounts,
 миграции Accounts/Publishing/Discussions, Bearer/JWKS, HTTP-контракты, проверка конфигурации и health.
 API предоставляет `/health/live` и `/health/ready`; OpenAPI 3.1 и Swagger UI включены
@@ -55,7 +55,23 @@ Admin с сохранением состояния. Удаление необр�
 с видимыми потомками возвращаются заглушками с `content=null`, `author=null`.
 Узлы без видимых потомков пропускаются. Публичный DTO не содержит edit version.
 Все операции требуют Published-материал, GET не учитывает просмотры.
-Маршруты модерации остаются в следующей фазе US5.
+
+Moderator/Admin получают `GET /api/v1/moderation/comments` с необязательными
+`publicationId`, `state=Visible|Hidden|Deleted` и стандартными `page`/`pageSize`.
+Список содержит только комментарии Published-материалов, включая сохранённый Hidden
+текст/автора и edit version, в порядке `createdAt/id DESC`. Заданный закрытый,
+удалённый или отсутствующий материал даёт 404. Очереди предварительного одобрения нет.
+
+`POST /api/v1/comments/{commentId}/hide` и `/restore` требуют Bearer Moderator/Admin,
+`X-Resource-Version` комментария и отсутствующего body. Переходы сохраняют текст/автора;
+повтор текущего состояния с текущей версией успешен без изменения версии/дат/счётчиков,
+устаревшая версия всегда даёт 409. Deleted нельзя скрыть или восстановить.
+Изменение узла и максимум четырёх ancestor counts фиксируется атомарно; видимые ответы
+остаются доступны через публичные заглушки. Владение материалом не даёт права модерации,
+Moderator не может переписывать/удалять чужие комментарии. Все ответы модерации — `no-store`.
+SQL/EXPLAIN 16 вариантов списка на 6000 комментариях сохраняются в
+`artifacts/validation/queries/us5-moderation.json`, обоснование индексов — в
+`artifacts/validation/us5-queries.md`. Запись лайков остаётся в следующей фазе US6.
 
 ### Требования и сборка
 

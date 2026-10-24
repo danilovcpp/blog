@@ -64,6 +64,18 @@ public sealed class Comment
         if (State == CommentState.Deleted) { return; }
         RequireUtc(now); State = CommentState.Deleted; Text = null; Changed(now);
     }
+    public void DemandModeration(CurrentActor actor) => AccessPolicy.Demand(actor, ActorAction.ModerateComments);
+    public void RequireVersion(Guid version)
+    { if (Version != version) { throw new DomainError("concurrency_conflict"); } }
+    public void Hide(CurrentActor actor, DateTimeOffset now) => SetVisibility(actor, CommentState.Hidden, now);
+    public void Restore(CurrentActor actor, DateTimeOffset now) => SetVisibility(actor, CommentState.Visible, now);
+    private void SetVisibility(CurrentActor actor, CommentState desired, DateTimeOffset now)
+    {
+        DemandModeration(actor);
+        if (State == CommentState.Deleted) { throw new DomainError("invalid_state"); }
+        if (State == desired) { return; }
+        RequireUtc(now); State = desired; Changed(now);
+    }
     private void Changed(DateTimeOffset now) { UpdatedAt = now; Version = Guid.NewGuid(); }
     private static void RequireUtc(DateTimeOffset now)
     { if (now.Offset != TimeSpan.Zero) { throw new ArgumentException("UTC is required.", nameof(now)); } }

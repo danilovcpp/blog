@@ -19,7 +19,8 @@ public static class CommentSchemas
             }
             var visible = name.EndsWith(nameof(VisibleCommentDto), StringComparison.Ordinal);
             var placeholder = name.EndsWith(nameof(CommentPlaceholderDto), StringComparison.Ordinal);
-            if (!visible && !placeholder && name != nameof(CommentEditContextDto)) { continue; }
+            var moderation = name == nameof(ModerationCommentDto);
+            if (!visible && !placeholder && !moderation && name != nameof(CommentEditContextDto)) { continue; }
             schema.Type = JsonSchemaType.Object;
             schema.Required ??= new HashSet<string>(); schema.Required.UnionWith(["state", "content", "author"]);
             schema.Properties!["createdAt"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "date-time" };
@@ -44,8 +45,9 @@ public static class CommentSchemas
                 { schema.Properties["state"] = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [JsonValue.Create("Visible")] }; }
                 else
                 {
-                    schema.Description = "Private owner/Admin context for a Published material. Owner Hidden content is null; Admin sees retained Hidden text. Deleted content is always null.";
-                    schema.OneOf = [PrivateState("Visible", JsonSchemaType.String), PrivateState("Hidden", JsonSchemaType.String | JsonSchemaType.Null), PrivateState("Deleted", JsonSchemaType.Null)];
+                    schema.Description = moderation ? "Moderator/Admin only; Published parents. Hidden text and author retained here. Deleted text is null. Never a public DTO."
+                        : "Private owner/Admin context for a Published material. Owner Hidden content is null; Admin sees retained Hidden text. Deleted content is always null.";
+                    schema.OneOf = [PrivateState("Visible", JsonSchemaType.String), PrivateState("Hidden", moderation ? JsonSchemaType.String : JsonSchemaType.String | JsonSchemaType.Null), PrivateState("Deleted", JsonSchemaType.Null)];
                 }
             }
         }

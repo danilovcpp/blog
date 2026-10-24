@@ -54,6 +54,8 @@ public static class ApiRegistration
         services.AddScoped<CommentService>();
         services.AddScoped<ICommentReader, CommentTreeQuery>();
         services.AddScoped<CommentEditQuery>();
+        services.AddScoped<ModerationService>();
+        services.AddScoped<ModerationQuery>();
         services.AddSingleton(provider => new JwksSettings(new Uri(provider.GetRequiredService<IOptions<IdentityOptions>>().Value.JwksUrl)));
         services.AddSingleton(_ => new HttpClient(new SocketsHttpHandler
         {
@@ -86,6 +88,7 @@ public static class ApiRegistration
             {
                 options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
                 options.AddDocumentTransformer(CommentSchemas.TransformAsync);
+                options.AddDocumentTransformer(ModerationOpenApi.TransformAsync);
             });
         }
         // Framework SQL/auth diagnostics can contain request data. The boundary writes safe structured events.

@@ -36,6 +36,8 @@ public sealed class CommentWriteStore(BlogDbContext db, IPublicationWriteScope s
             var wasVisible = comment.State == CommentState.Visible;
             mutation(comment, session.UtcNow);
             await db.SaveChangesAsync(token);
+            // Hide/restore affects only this node's contribution, never its still-visible descendants.
+            // Desired-state no-ops retain version/dates and produce zero ancestor writes.
             var delta = (comment.State == CommentState.Visible ? 1 : 0) - (wasVisible ? 1 : 0);
             if (delta != 0) { await AdjustAncestorsAsync(comment, delta, token); }
             return CommentSnapshot.From(comment);
