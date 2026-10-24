@@ -12,6 +12,7 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
 {
     public DbSet<LocalUser> LocalUsers => Set<LocalUser>();
     public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+    public DbSet<RoleChangeAudit> RoleChangeAudits => Set<RoleChangeAudit>();
     public DbSet<Publication> Publications => Set<Publication>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Tag> Tags => Set<Tag>();
@@ -23,6 +24,7 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
     {
         modelBuilder.ApplyConfiguration(new LocalUserConfiguration());
         modelBuilder.ApplyConfiguration(new RoleAssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new RoleChangeAuditConfiguration());
         modelBuilder.ApplyConfiguration(new PublicationConfiguration());
         modelBuilder.ApplyConfiguration<Category>(new TaxonomyConfiguration());
         modelBuilder.ApplyConfiguration<Tag>(new TaxonomyConfiguration());

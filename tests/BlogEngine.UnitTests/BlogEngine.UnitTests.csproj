@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/BlogEngine.Core/BlogEngine.Core.csproj" />
+    <ProjectReference Include="../../src/BlogEngine.Operator/BlogEngine.Operator.csproj" />
     <PackageReference Include="xunit.v3.mtp-off" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

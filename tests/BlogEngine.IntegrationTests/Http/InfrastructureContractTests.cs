@@ -172,8 +172,8 @@ public sealed class InfrastructureContractTests
         client.DefaultRequestHeaders.Authorization = null;
         using var utc = await client.GetAsync("/__foundation/time", TestContext.Current.CancellationToken);
         Assert.Contains("1970-01-01T00:00:00Z", await utc.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
-        using var absentMe = await client.GetAsync("/api/v1/me", TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.NotFound, absentMe.StatusCode);
+        using var protectedMe = await client.GetAsync("/api/v1/me", TestContext.Current.CancellationToken);
+        await AssertProblem(protectedMe, 401, "authentication_required");
     }
 
     internal static async Task AssertProblem(HttpResponseMessage response, int status, string code)

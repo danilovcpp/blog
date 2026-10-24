@@ -30,6 +30,7 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 app.UseMiddleware<RequestContractValidation>();
 app.MapHealthEndpoints();
+app.MapMeEndpoints();
 app.MapPublicationCommandEndpoints();
 app.MapWorkspaceEndpoints();
 app.MapTaxonomyEndpoints();

@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- Run with psql as the database provisioner after AddPublishing. All four principals must already exist.
+-- Run with psql as the database provisioner after AddRoleChangeAudit. All four principals must already exist.
 -- Pass identifier variables owner_role, migration_role, runtime_role, operator_role. Never pass passwords here.
 BEGIN;
 SELECT format('REVOKE CREATE, TEMP ON DATABASE %I FROM PUBLIC', current_database()) \gexec
@@ -10,12 +10,15 @@ GRANT :"owner_role" TO :"migration_role";
 ALTER SCHEMA accounts OWNER TO :"owner_role";
 ALTER TABLE accounts.local_users OWNER TO :"owner_role";
 ALTER TABLE accounts.role_assignments OWNER TO :"owner_role";
+ALTER TABLE accounts.role_change_audit OWNER TO :"owner_role";
 REVOKE ALL ON SCHEMA accounts FROM PUBLIC, :"runtime_role", :"operator_role";
 REVOKE ALL ON ALL TABLES IN SCHEMA accounts FROM PUBLIC, :"runtime_role", :"operator_role";
 GRANT USAGE ON SCHEMA accounts TO :"runtime_role", :"operator_role";
 GRANT SELECT, INSERT ON accounts.local_users TO :"runtime_role";
 GRANT SELECT ON accounts.role_assignments TO :"runtime_role";
 GRANT SELECT ON accounts.local_users, accounts.role_assignments TO :"operator_role";
+GRANT INSERT, DELETE ON accounts.role_assignments TO :"operator_role";
+GRANT SELECT, INSERT ON accounts.role_change_audit TO :"operator_role";
 ALTER SCHEMA publishing OWNER TO :"owner_role";
 ALTER SCHEMA engagement OWNER TO :"owner_role";
 SELECT format('ALTER TABLE %I.%I OWNER TO %I', schemaname, tablename, :'owner_role')

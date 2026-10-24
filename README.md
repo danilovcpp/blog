@@ -33,9 +33,11 @@ Reading-тесты используют неизменный набор из 250
 устаревшая версия даёт 409. Slug неизменен после первой публикации и остаётся занят
 после удаления. Public detail не содержит edit version/state; workspace list не содержит
 Markdown. Публичные content-ответы используют `private, no-store`/`Vary: Authorization`.
-Повышенные роли для автоматических проверок создаёт изолированная fixture.
-Команды Operator появятся в US3. Operator проверяет свою конфигурацию (код 5 при ошибке), неизвестная команда
-возвращает 2. Performance harness пока возвращает 2.
+`GET /api/v1/me` создаёт локальную связь с Reader и возвращает только ID/текущие роли.
+Повышенные роли выдаёт отдельный Operator: users find, roles list/grant/revoke с
+атомарным неизменяемым аудитом, в том числе для no-op. Порядок первого Admin,
+exit codes и проверка неизвестного commit описаны в [roles.md](docs/operations/roles.md).
+Performance harness пока возвращает 2.
 
 ### Требования и сборка
 
@@ -91,8 +93,8 @@ API — необходимый DML и SELECT ролей, Operator — огран
 миграции — отдельный deployment-шаг с DDL. Runtime hosts не применяют миграции.
 Создание principals и применение ограниченных grants описаны в
 [`database.md`](docs/operations/database.md); скрипт для Accounts/Publishing/likes-таблиц —
-[`permissions.sql`](ops/database/permissions.sql). Operator пока имеет только чтение
-Accounts; назначение ролей и аудит входят в US3.
+[`permissions.sql`](ops/database/permissions.sql). Operator читает Accounts, меняет
+только назначения и добавляет аудит; API не имеет доступа к аудиту/записи ролей.
 
 ### Конфигурация без секретов
 

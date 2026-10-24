@@ -58,7 +58,7 @@ public sealed class DatabasePermissionsTests(PostgresFixture postgres) : IClassF
         await setOperator.ExecuteNonQueryAsync(ct);
         await using var select = new NpgsqlCommand("SELECT count(*) FROM accounts.local_users", admin);
         Assert.Equal(1L, await select.ExecuteScalarAsync(ct));
-        await using var forbidden = new NpgsqlCommand("INSERT INTO accounts.role_assignments SELECT id,3,now() FROM accounts.local_users", admin);
-        Assert.Equal("42501", (await Assert.ThrowsAsync<PostgresException>(() => forbidden.ExecuteNonQueryAsync(ct))).SqlState);
+        await using var allowed = new NpgsqlCommand("INSERT INTO accounts.role_assignments SELECT id,3,now() FROM accounts.local_users", admin);
+        Assert.Equal(1, await allowed.ExecuteNonQueryAsync(ct));
     }
 }
