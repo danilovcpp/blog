@@ -1,0 +1,2193 @@
+openapi: 3.1.0
+info:
+  title: Blog Engine MVP
+  version: 1.0.0
+  description: 'Phase 1 normative contract, not an implemented service. Backend for one project. Supplemental security/operator/visibility
+    rules: operations.md. All dates UTC. Input lengths count Unicode scalars after documented trim; Markdown limit
+    counts UTF-8 bytes. Request bodies <=8MiB, unknown fields rejected; GET/command methods without requestBody
+    must not send a body. All errors ProblemDetails. Public requests may carry Bearer for personalization; a supplied
+    invalid Bearer fails instead of becoming anonymous. No cookies, profile API, Identity account proxy or HTTP
+    role management. No response cache shared across users. Unsupported Accept yields406 ProblemDetails; unknown
+    routes404 and methods405 also use ProblemDetails.'
+servers:
+- url: /
+  description: Current installation; no production endpoint implied.
+security:
+- Bearer: []
+paths:
+  /api/v1/me:
+    get:
+      operationId: getMe
+      summary: Resolve the current local user and effective roles
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: &id001
+            Cache-Control: &id003
+              schema:
+                type: string
+                const: private, no-store
+            Vary: &id004
+              schema:
+                type: string
+                const: Authorization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Creates exactly one local issuer+sub mapping if absent; Reader is implicit. No HTTP role mutation.
+      x-request-body: must be absent
+  /api/v1/publications:
+    get:
+      operationId: listPublications
+      summary: Page through Published publications
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationPage'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: 'Recent: firstPublishedAt DESC,id DESC. Popular: likeCount DESC,firstPublishedAt DESC,id DESC.
+        Does not register views. Never returns Markdown. Empty existing filters yield empty page; unknown filter
+        ID=400.'
+      parameters:
+      - &id005
+        $ref: '#/components/parameters/Page'
+      - &id006
+        $ref: '#/components/parameters/PageSize'
+      - name: categoryIds
+        in: query
+        style: form
+        explode: true
+        schema:
+          type: array
+          items: &id002
+            type: string
+            format: uuid
+          minItems: 0
+          maxItems: 5
+          uniqueItems: true
+        description: Repeated parameter. Any chosen category AND all chosen tags. Unknown/duplicate IDs=400.
+      - name: tagIds
+        in: query
+        style: form
+        explode: true
+        schema:
+          type: array
+          items: *id002
+          minItems: 0
+          maxItems: 20
+          uniqueItems: true
+        description: Repeated parameter; every chosen tag must match. Unknown/duplicate IDs=400.
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - recent
+          - popular
+          default: recent
+      x-request-body: must be absent
+    post:
+      operationId: createPublication
+      summary: Create own Draft
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          description: Success
+          headers:
+            Cache-Control: *id003
+            Vary: *id004
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+              description: URI of the created resource or authorized edit context.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePublication'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      x-authorization: Author or Admin; owner from verified local identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicationWrite'
+  /api/v1/publications/by-slug/{slug}:
+    get:
+      operationId: getPublicationBySlug
+      summary: Read Published publication by permanent slug
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Publication'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: No view registration. Draft/deleted/absent all 404, including for owner; use workspace for private
+        content.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: &id008
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+          description: Strict canonical slug; no trim/case conversion. Publication slug immutable after first publication
+            and permanently reserved after deletion; taxonomy slug immutable after creation.
+      x-request-body: must be absent
+  /api/v1/publications/{id}:
+    get:
+      operationId: getPublication
+      summary: Read Published publication by ID
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Publication'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Public only; Draft/deleted/absent all 404 even for owner. No view registration.
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      x-request-body: must be absent
+    put:
+      operationId: updatePublication
+      summary: Replace editable publication fields
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePublication'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published edits are immediately public. After first publication slug and firstPublishedAt remain
+        unchanged, including after unpublish. State changed only by explicit commands.
+      x-authorization: Own Author or Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicationWrite'
+    delete:
+      operationId: deletePublication
+      summary: Permanently make publication and interactions unavailable
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: Success
+          headers: *id001
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Terminal tombstone reserves slug. Removes taxonomy assignments; no restore. All child reads/writes
+        become inaccessible.
+      x-authorization: Own Author or Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/publications/{id}/publish:
+    post:
+      operationId: publishPublication
+      summary: Publish own publication
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePublication'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Requires nonblank Markdown; firstPublishedAt assigned once. Re-publish retains first timestamp.
+        Current-version command already in desired state succeeds unchanged; stale version still conflicts.
+      x-authorization: Own Author or Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/publications/{id}/unpublish:
+    post:
+      operationId: unpublishPublication
+      summary: Unpublish own publication
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePublication'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Returns Draft; discussion and reactions retained but inaccessible publicly. Current-version command
+        already in desired state succeeds unchanged; stale version still conflicts.
+      x-authorization: Own Author or Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/workspace/publications:
+    get:
+      operationId: listWorkspacePublications
+      summary: Page through own materials, or all for Admin
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePage'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: updatedAt DESC,id DESC. Includes version and state, no Markdown; deleted rows excluded.
+      x-authorization: 'Author: own; Admin: all; Moderator alone forbidden'
+      parameters:
+      - *id005
+      - *id006
+      - name: state
+        in: query
+        schema:
+          type: string
+          enum:
+          - Draft
+          - Published
+      x-request-body: must be absent
+  /api/v1/workspace/publications/{id}:
+    get:
+      operationId: getWorkspacePublication
+      summary: Read authorized editing representation
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspacePublication'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Includes Draft and version. Foreign Draft/absent/deleted 404; published foreign edit-context
+        403.
+      x-authorization: Own Author or Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      x-request-body: must be absent
+  /api/v1/categories:
+    get:
+      operationId: listCategories
+      summary: List categories
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyPage'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: name COLLATE C ASC,id ASC. Immutable slug; version supports Admin rename/delete.
+      parameters: &id007
+      - *id005
+      - *id006
+      x-request-body: must be absent
+    post:
+      operationId: createCategory
+      summary: Create category
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          description: Success
+          headers:
+            Cache-Control: *id003
+            Vary: *id004
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+              description: URI of the created resource or authorized edit context.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      x-authorization: Admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyCreate'
+  /api/v1/categories/{id}:
+    get:
+      operationId: getCategory
+      summary: Read category
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      x-request-body: must be absent
+    put:
+      operationId: renameCategory
+      summary: Rename category
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Slug is immutable; new name appears in associated materials.
+      x-authorization: Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyRename'
+    delete:
+      operationId: deleteCategory
+      summary: Delete unused category
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: Success
+          headers: *id001
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Any remaining publication assignment =>409 taxonomy_in_use.
+      x-authorization: Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/tags:
+    get:
+      operationId: listTags
+      summary: List tags
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxonomyPage'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: name COLLATE C ASC,id ASC. Immutable slug; version supports Admin rename/delete.
+      parameters: *id007
+      x-request-body: must be absent
+    post:
+      operationId: createTag
+      summary: Create tag
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          description: Success
+          headers:
+            Cache-Control: *id003
+            Vary: *id004
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+              description: URI of the created resource or authorized edit context.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      x-authorization: Admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyCreate'
+  /api/v1/tags/{id}:
+    get:
+      operationId: getTag
+      summary: Read tag
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      x-request-body: must be absent
+    put:
+      operationId: renameTag
+      summary: Rename tag
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Taxonomy'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Slug is immutable; new name appears in associated materials.
+      x-authorization: Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxonomyRename'
+    delete:
+      operationId: deleteTag
+      summary: Delete unused tag
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: Success
+          headers: *id001
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Any remaining publication assignment =>409 taxonomy_in_use.
+      x-authorization: Admin
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/publications/{id}/comments:
+    get:
+      operationId: listComments
+      summary: Page roots or direct children
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentPage'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published parent only. createdAt ASC,id ASC. Visible or structural placeholder with visible descendants;
+        no whole subtree. Does not register views.
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - *id005
+      - *id006
+      - name: parentId
+        in: query
+        schema: *id002
+        description: 'Omitted: roots. Present: direct children of this includable parent in this publication. Foreign/absent/non-includable
+          parent=404.'
+      x-request-body: must be absent
+    post:
+      operationId: createComment
+      summary: Create immediately Visible comment or reply
+      security:
+      - Bearer: []
+      responses:
+        '201':
+          description: Success
+          headers:
+            Cache-Control: *id003
+            Vary: *id004
+            Location:
+              schema:
+                type: string
+                format: uri-reference
+              description: URI of the created resource or authorized edit context.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentEditContext'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Parent must be Visible, same publication, depth below five. Caller cannot set author, publication
+        or timestamps.
+      x-authorization: Reader (includes all local roles)
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+  /api/v1/comments/{commentId}:
+    get:
+      operationId: getCommentEditContext
+      summary: Read own comment version or Admin edit context
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentEditContext'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published parent required. Owner receives Hidden content=null but version for delete. Admin sees
+        retained Hidden text. Deleted always null.
+      x-authorization: Owner or Admin; Moderator uses moderation list
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      x-request-body: must be absent
+    put:
+      operationId: updateComment
+      summary: Edit comment text
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentEditContext'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Sets editedAt. Visible edit immediately public; no approval. Publication/author/parent immutable.
+      x-authorization: 'Visible: owner or Admin. Hidden: only Admin, preserving Hidden. Deleted forbidden.'
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/Version'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentUpdate'
+    delete:
+      operationId: deleteComment
+      summary: Delete own comment or any as Admin
+      security:
+      - Bearer: []
+      responses:
+        '204':
+          description: Success
+          headers: *id001
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Clears text irreversibly and preserves tree. Current-version repeat Deleted succeeds without
+        version rotation. Published parent required.
+      x-authorization: Owner or Admin; Hidden owner may delete; Moderator cannot delete foreign
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/moderation/comments:
+    get:
+      operationId: listModerationComments
+      summary: Page comments for subsequent moderation
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationPage'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published parent publications only. createdAt DESC,id DESC. Includes retained Hidden text and
+        versions; no approval queue.
+      x-authorization: Moderator or Admin
+      parameters:
+      - *id005
+      - *id006
+      - name: publicationId
+        in: query
+        schema: *id002
+        description: If supplied, parent must exist and be Published; otherwise404.
+      - name: state
+        in: query
+        schema:
+          type: string
+          enum:
+          - Visible
+          - Hidden
+          - Deleted
+      x-request-body: must be absent
+  /api/v1/comments/{commentId}/hide:
+    post:
+      operationId: hideComment
+      summary: Hide comment
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationComment'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published parent required. Deleted cannot be hidden/restored. Current-version already desired
+        state succeeds unchanged; stale always409. Ancestor placeholder counts updated atomically.
+      x-authorization: Moderator or Admin
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/comments/{commentId}/restore:
+    post:
+      operationId: restoreComment
+      summary: Restore comment
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationComment'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '413':
+          $ref: '#/components/responses/Error413'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published parent required. Deleted cannot be hidden/restored. Current-version already desired
+        state succeeds unchanged; stale always409. Ancestor placeholder counts updated atomically.
+      x-authorization: Moderator or Admin
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/Version'
+      x-request-body: must be absent
+  /api/v1/publications/{id}/counters:
+    get:
+      operationId: getCounters
+      summary: Read counters and current user like state
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Counters'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published only. Anonymous isLikedByCurrentUser=false. Does not register views.
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      x-request-body: must be absent
+  /api/v1/publications/{id}/like:
+    put:
+      operationId: setLike
+      summary: Set own like idempotently
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Counters'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published only. Repeating desired state succeeds without extra counter delta. No resource version
+        header; no public liker list.
+      x-authorization: Reader
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      x-request-body: must be absent
+    delete:
+      operationId: removeLike
+      summary: Remove own like idempotently
+      security:
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Counters'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published only. Repeating desired state succeeds without extra counter delta. No resource version
+        header; no public liker list.
+      x-authorization: Reader
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      x-request-body: must be absent
+  /api/v1/publications/{id}/views:
+    post:
+      operationId: registerView
+      summary: Explicitly register an opening with a 24-hour fixed window
+      security:
+      - {}
+      - Bearer: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViewResult'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: Published only, anonymous or verified user. Repeats before last counted T+24h do not advance
+        T; equality counts one new opening. Authenticated visitor is local identity across devices; anonymous history
+        not merged. New anonymous ID issued only on success. atomic source and counter change across replicas.
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/AnonymousVisitor'
+      x-request-body: must be absent
+  /health/live:
+    get:
+      operationId: healthLive
+      summary: Live health
+      security: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+      description: Process only; no dependency checks.
+      x-request-body: must be absent
+  /health/ready:
+    get:
+      operationId: healthReady
+      summary: Ready health
+      security: []
+      responses:
+        '200':
+          description: Success
+          headers: *id001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          $ref: '#/components/responses/Error503'
+      description: 'Internal ingress only: PostgreSQL and fresh usable JWKS; same bounded/coalesced loader. Outage
+        with fresh key cache remains ready. No dependency/config details.'
+      x-request-body: must be absent
+components:
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: External Identity RS256 access JWT; exact configured issuer/audience and local roles. See operations.md.
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        default: 1
+      description: Valid pages beyond the collection return empty items and hasNextPage=false. Checked int64 offset.
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Version:
+      name: X-Resource-Version
+      in: header
+      required: true
+      schema: *id002
+      description: Opaque edit version from prior authorized read. Missing/malformed=400; stale=409. Check access
+        before revealing conflicts. No strong ETag semantics; counters do not rotate edit version.
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: *id002
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema: *id002
+    AnonymousVisitor:
+      name: X-Anonymous-Visitor
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Engine-issued anonymous token. Absent/unusable/over256 characters creates a new token; ignored
+        for valid Bearer. No cookies; not an account credential. HTTP server header envelope limits remain applicable.
+  schemas:
+    Problem:
+      type: object
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          description: Stable machine code; see operations.md.
+          enum:
+          - validation_failed
+          - invalid_request
+          - authentication_required
+          - invalid_token
+          - forbidden
+          - resource_not_found
+          - concurrency_conflict
+          - slug_conflict
+          - taxonomy_in_use
+          - invalid_state
+          - request_too_large
+          - unsupported_media_type
+          - method_not_allowed
+          - not_acceptable
+          - internal_error
+          - dependency_unavailable
+          - identity_keys_unavailable
+        detail:
+          type: string
+          description: Safe description; never SQL, tokens or stack trace.
+        traceId:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+            minItems: 0
+      required:
+      - type
+      - title
+      - status
+      - code
+      - traceId
+    AuthorRef:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+      required:
+      - id
+      description: Opaque local author reference, not an Identity subject or profile URL. Public profile endpoints
+        are outside MVP.
+    Taxonomy:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+        name: &id009
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Trimmed; Unicode scalar value length.
+        slug: *id008
+        version: *id002
+      required:
+      - id
+      - name
+      - slug
+      - version
+    TaxonomyCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        name: *id009
+        slug: *id008
+      required:
+      - name
+      - slug
+    TaxonomyRename:
+      type: object
+      additionalProperties: false
+      properties:
+        name: *id009
+      required:
+      - name
+    Counters:
+      type: object
+      additionalProperties: false
+      properties:
+        likeCount: &id010
+          type: integer
+          format: int64
+          minimum: 0
+        viewCount: *id010
+        isLikedByCurrentUser: &id012
+          type: boolean
+      required:
+      - likeCount
+      - viewCount
+      - isLikedByCurrentUser
+    PublicationCard:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+        title: &id013
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed Unicode scalar length.
+        slug: *id008
+        description: &id014
+          anyOf:
+          - type: string
+            minLength: 0
+            maxLength: 500
+          - type: 'null'
+        coverUrl: &id015
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 2048
+            format: uri
+            pattern: ^[Hh][Tt][Tt][Pp][Ss]://
+            description: Absolute HTTPS URI with host; no fetching or availability test.
+          - type: 'null'
+        author: &id016
+          $ref: '#/components/schemas/AuthorRef'
+        createdAt: &id011
+          type: string
+          format: date-time
+          description: UTC instant, RFC 3339, suffix Z.
+        updatedAt: *id011
+        firstPublishedAt: *id011
+        categories: &id017
+          type: array
+          items:
+            $ref: '#/components/schemas/Taxonomy'
+          minItems: 0
+          maxItems: 5
+        tags: &id018
+          type: array
+          items:
+            $ref: '#/components/schemas/Taxonomy'
+          minItems: 0
+          maxItems: 20
+        likeCount: *id010
+        viewCount: *id010
+        isLikedByCurrentUser: *id012
+      required:
+      - id
+      - title
+      - slug
+      - description
+      - coverUrl
+      - author
+      - createdAt
+      - updatedAt
+      - firstPublishedAt
+      - categories
+      - tags
+      - likeCount
+      - viewCount
+      - isLikedByCurrentUser
+    Publication:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+        title: *id013
+        slug: *id008
+        description: *id014
+        coverUrl: *id015
+        author: *id016
+        createdAt: *id011
+        updatedAt: *id011
+        firstPublishedAt: *id011
+        categories: *id017
+        tags: *id018
+        likeCount: *id010
+        viewCount: *id010
+        isLikedByCurrentUser: *id012
+        markdown: &id032
+          type: string
+          maxLength: 1048576
+          x-maxUtf8Bytes: 1048576
+          description: Untrusted Markdown source, at most 1 MiB UTF-8 after JSON decoding. Whitespace/empty allowed
+            only for Draft. Engine does not render trusted HTML.
+      required:
+      - id
+      - title
+      - slug
+      - description
+      - coverUrl
+      - author
+      - createdAt
+      - updatedAt
+      - firstPublishedAt
+      - categories
+      - tags
+      - likeCount
+      - viewCount
+      - isLikedByCurrentUser
+      - markdown
+    WorkspaceCard:
+      type: object
+      additionalProperties: false
+      properties:
+        id: &id021
+          type: string
+          format: uuid
+        title: &id022
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed Unicode scalar length.
+        slug: &id023
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+          description: Strict canonical slug; no trim/case conversion. Publication slug immutable after first publication
+            and permanently reserved after deletion; taxonomy slug immutable after creation.
+        description: &id024
+          anyOf:
+          - type: string
+            minLength: 0
+            maxLength: 500
+          - type: 'null'
+        coverUrl: &id025
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 2048
+            format: uri
+            pattern: ^[Hh][Tt][Tt][Pp][Ss]://
+            description: Absolute HTTPS URI with host; no fetching or availability test.
+          - type: 'null'
+        author: &id026
+          $ref: '#/components/schemas/AuthorRef'
+        createdAt: &id019
+          type: string
+          format: date-time
+          description: UTC instant, RFC 3339, suffix Z.
+        updatedAt: *id019
+        firstPublishedAt: &id027
+          anyOf:
+          - type: string
+            format: date-time
+            description: UTC instant, RFC 3339, suffix Z.
+          - type: 'null'
+        categories: &id028
+          type: array
+          items:
+            $ref: '#/components/schemas/Taxonomy'
+          minItems: 0
+          maxItems: 5
+        tags: &id029
+          type: array
+          items:
+            $ref: '#/components/schemas/Taxonomy'
+          minItems: 0
+          maxItems: 20
+        likeCount: &id020
+          type: integer
+          format: int64
+          minimum: 0
+        viewCount: *id020
+        isLikedByCurrentUser: &id030
+          type: boolean
+        state: &id031
+          type: string
+          enum:
+          - Draft
+          - Published
+        version: *id002
+      required:
+      - id
+      - title
+      - slug
+      - description
+      - coverUrl
+      - author
+      - createdAt
+      - updatedAt
+      - firstPublishedAt
+      - categories
+      - tags
+      - likeCount
+      - viewCount
+      - isLikedByCurrentUser
+      - state
+      - version
+    WorkspacePublication:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id021
+        title: *id022
+        slug: *id023
+        description: *id024
+        coverUrl: *id025
+        author: *id026
+        createdAt: *id019
+        updatedAt: *id019
+        firstPublishedAt: *id027
+        categories: *id028
+        tags: *id029
+        likeCount: *id020
+        viewCount: *id020
+        isLikedByCurrentUser: *id030
+        state: *id031
+        version: *id002
+        markdown: *id032
+      required:
+      - id
+      - title
+      - slug
+      - description
+      - coverUrl
+      - author
+      - createdAt
+      - updatedAt
+      - firstPublishedAt
+      - categories
+      - tags
+      - likeCount
+      - viewCount
+      - isLikedByCurrentUser
+      - state
+      - version
+      - markdown
+    PublicationWrite:
+      type: object
+      additionalProperties: false
+      properties:
+        title: *id013
+        slug: *id008
+        markdown: *id032
+        description:
+          anyOf:
+          - type: string
+            minLength: 0
+            maxLength: 500
+          - type: 'null'
+        coverUrl: *id015
+        categoryIds:
+          type: array
+          items: *id002
+          minItems: 0
+          maxItems: 5
+          uniqueItems: true
+        tagIds:
+          type: array
+          items: *id002
+          minItems: 0
+          maxItems: 20
+          uniqueItems: true
+      required:
+      - title
+      - slug
+      - markdown
+      - categoryIds
+      - tagIds
+      description: Create Draft or replace editable fields. Omitted description/coverUrl clear them to null. Caller
+        cannot set owner, state, timestamps, counters or version. Unknown properties rejected. All assigned IDs
+        must exist.
+    VisibleComment:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+        publicationId: *id002
+        parentId: &id033
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        depth: &id034
+          type: integer
+          minimum: 1
+          maximum: 5
+        createdAt: *id011
+        editedAt: &id035
+          anyOf:
+          - type: string
+            format: date-time
+            description: UTC instant, RFC 3339, suffix Z.
+          - type: 'null'
+        hasReplies: &id036
+          type: boolean
+        state:
+          type: string
+          const: Visible
+        content: &id037
+          type: string
+          minLength: 1
+          maxLength: 5000
+          description: Trimmed plain untrusted text; Unicode scalar value length.
+        author:
+          $ref: '#/components/schemas/AuthorRef'
+      required:
+      - id
+      - publicationId
+      - parentId
+      - depth
+      - createdAt
+      - editedAt
+      - hasReplies
+      - state
+      - content
+      - author
+    CommentPlaceholder:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+        publicationId: *id002
+        parentId: *id033
+        depth: *id034
+        createdAt: *id011
+        editedAt: *id035
+        hasReplies: *id036
+        state:
+          type: string
+          enum:
+          - Hidden
+          - Deleted
+        content:
+          type: 'null'
+        author:
+          type: 'null'
+      required:
+      - id
+      - publicationId
+      - parentId
+      - depth
+      - createdAt
+      - editedAt
+      - hasReplies
+      - state
+      - content
+      - author
+      description: Included only with visible descendants. No text/author; hasReplies refers to includable direct
+        children. No unbounded subtree.
+    PublicComment:
+      oneOf:
+      - $ref: '#/components/schemas/VisibleComment'
+      - $ref: '#/components/schemas/CommentPlaceholder'
+    CommentCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        content: *id037
+        parentId:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+      required:
+      - content
+    CommentUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        content: *id037
+      required:
+      - content
+    CommentEditContext:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+        publicationId: *id002
+        parentId:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        depth:
+          type: integer
+          minimum: 1
+          maximum: 5
+        state:
+          type: string
+          enum:
+          - Visible
+          - Hidden
+          - Deleted
+        content:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 5000
+            description: Trimmed plain untrusted text; Unicode scalar value length.
+          - type: 'null'
+        author:
+          $ref: '#/components/schemas/AuthorRef'
+        createdAt: *id011
+        editedAt:
+          anyOf:
+          - type: string
+            format: date-time
+            description: UTC instant, RFC 3339, suffix Z.
+          - type: 'null'
+        version: *id002
+      required:
+      - id
+      - publicationId
+      - parentId
+      - depth
+      - state
+      - content
+      - author
+      - createdAt
+      - editedAt
+      - version
+      description: Private owner/Admin projection for a Published parent. Own Hidden content is null; Admin sees
+        retained Hidden text. Deleted content is always null. A new version is retrieved here before owner deletion
+        of Hidden content.
+      allOf:
+      - if:
+          properties:
+            state:
+              const: Visible
+        then:
+          properties:
+            content:
+              type: string
+              minLength: 1
+              maxLength: 5000
+      - if:
+          properties:
+            state:
+              const: Deleted
+        then:
+          properties:
+            content:
+              type: 'null'
+    ModerationComment:
+      type: object
+      additionalProperties: false
+      properties:
+        id: &id038
+          type: string
+          format: uuid
+        publicationId: *id038
+        parentId:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        depth:
+          type: integer
+          minimum: 1
+          maximum: 5
+        state:
+          type: string
+          enum:
+          - Visible
+          - Hidden
+          - Deleted
+        content:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 5000
+            description: Trimmed plain untrusted text; Unicode scalar value length.
+          - type: 'null'
+        author:
+          $ref: '#/components/schemas/AuthorRef'
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC instant, RFC 3339, suffix Z.
+        editedAt:
+          anyOf:
+          - type: string
+            format: date-time
+            description: UTC instant, RFC 3339, suffix Z.
+          - type: 'null'
+        version: *id038
+      required:
+      - id
+      - publicationId
+      - parentId
+      - depth
+      - state
+      - content
+      - author
+      - createdAt
+      - editedAt
+      - version
+      description: Moderator/Admin only; Published parents. Hidden text/author retained here, Deleted text null.
+        Never a public DTO.
+      allOf:
+      - if:
+          properties:
+            state:
+              const: Visible
+        then:
+          properties:
+            content:
+              type: string
+              minLength: 1
+              maxLength: 5000
+      - if:
+          properties:
+            state:
+              const: Deleted
+        then:
+          properties:
+            content:
+              type: 'null'
+    ViewResult:
+      type: object
+      additionalProperties: false
+      properties:
+        counted:
+          type: boolean
+        viewCount: *id010
+        anonymousVisitorId:
+          anyOf:
+          - type: string
+            maxLength: 256
+            description: Opaque engine-issued ID. Store and return as X-Anonymous-Visitor; never choose a user ID.
+              null with Bearer.
+          - type: 'null'
+      required:
+      - counted
+      - viewCount
+      - anonymousVisitorId
+    Me:
+      type: object
+      additionalProperties: false
+      properties:
+        id: *id002
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - Reader
+            - Author
+            - Moderator
+            - Admin
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+      required:
+      - id
+      - roles
+    Health:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+          - live
+          - ready
+      required:
+      - status
+    PublicationPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicationCard'
+          minItems: 0
+          maxItems: 100
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        hasNextPage:
+          type: boolean
+      required:
+      - items
+      - page
+      - pageSize
+      - hasNextPage
+    WorkspacePage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkspaceCard'
+          minItems: 0
+          maxItems: 100
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        hasNextPage:
+          type: boolean
+      required:
+      - items
+      - page
+      - pageSize
+      - hasNextPage
+    TaxonomyPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Taxonomy'
+          minItems: 0
+          maxItems: 100
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        hasNextPage:
+          type: boolean
+      required:
+      - items
+      - page
+      - pageSize
+      - hasNextPage
+    CommentPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicComment'
+          minItems: 0
+          maxItems: 100
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        hasNextPage:
+          type: boolean
+      required:
+      - items
+      - page
+      - pageSize
+      - hasNextPage
+    ModerationPage:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModerationComment'
+          minItems: 0
+          maxItems: 100
+        page:
+          type: integer
+          format: int32
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        hasNextPage:
+          type: boolean
+      required:
+      - items
+      - page
+      - pageSize
+      - hasNextPage
+  responses:
+    Error400:
+      description: validation_failed or invalid_request; field errors for invalid values, unknown fields or malformed
+        JSON.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error401:
+      description: authentication_required when Bearer is absent on a protected operation; invalid_token for a supplied
+        invalid token or unknown key after successful JWKS refresh. No anonymous fallback.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          description: Bearer challenge without sensitive error details.
+    Error403:
+      description: forbidden; verified identity lacks permission.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error404:
+      description: resource_not_found; absent or inaccessible resource. Draft/deleted public lookups are indistinguishable.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error409:
+      description: concurrency_conflict, slug_conflict, taxonomy_in_use or invalid_state; no overwrite/partial write.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error413:
+      description: request_too_large; global JSON body limit 8 MiB. Decoded field-size violations are400 validation_failed
+        unless the global envelope is exceeded.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error415:
+      description: unsupported_media_type; request body must be application/json.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error500:
+      description: internal_error; safe details and traceId.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Error503:
+      description: dependency_unavailable for database/infrastructure failure; identity_keys_unavailable when a
+        required JWKS fetch cannot provide a usable key. Fail closed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+x-global-errors:
+  '404': 'unknown route: resource_not_found'
+  '405': method_not_allowed
+  '406': not_acceptable
+  '413': request_too_large
+x-documentation:
+  security-and-operator: operations.md
+  data-model: ../data-model.md
+  validation: ../quickstart.md
