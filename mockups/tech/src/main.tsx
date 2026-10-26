@@ -8,6 +8,7 @@ import "./styles.css";
 import "./tech.css";
 import "./generic.css";
 import "./themes/tones.css";
+import "./components/post-actions.css";
 
 applyTheme();
 const router = createBrowserRouter([{ path: "*", element: <App /> }]);

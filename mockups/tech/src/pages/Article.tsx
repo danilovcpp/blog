@@ -4,7 +4,6 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-    Bookmark,
     Cpu,
     Clock3,
     Wrench,
@@ -14,9 +13,6 @@ import {
     ArrowUpRight,
     Check,
     ChevronDown,
-    Eye,
-    Heart,
-    Link2,
     LockKeyhole,
     MessageCircle,
     MoreHorizontal,
@@ -42,6 +38,7 @@ import {
 import { PostCard, NotFound } from "./Journal";
 import { commentInPublicTree } from "../mock/rules";
 import { tagTone } from "../themes/tones";
+import { PostIcon } from "../components/PostIcon";
 
 export function Markdown({ value }: { value: string }) {
     return (
@@ -194,26 +191,28 @@ export function Article() {
                             />
                         )}
                         <div className="article-action-bar">
+                            <span aria-label={`Просмотры: ${post.viewCount}`}>
+                                <PostIcon name="views" />
+                                {post.viewCount.toLocaleString("ru")}
+                            </span>
+                            <a
+                                href="#comments"
+                                aria-label={`Комментарии: ${count}`}
+                            >
+                                <PostIcon name="comments" />
+                                {count}
+                            </a>
                             <button
-                                className={liked ? "liked" : ""}
+                                className={`post-like${liked ? " is-active" : ""}`}
+                                aria-label={liked ? "Убрать лайк" : "Нравится"}
                                 aria-pressed={liked}
+                                aria-busy={likeBusy}
                                 disabled={likeBusy}
                                 onClick={like}
                             >
-                                <Heart
-                                    size={17}
-                                    fill={liked ? "currentColor" : "none"}
-                                />
+                                <PostIcon name="heart" active={liked} />
                                 {post.likeCount}
                             </button>
-                            <span>
-                                <Eye size={16} />
-                                {post.viewCount.toLocaleString("ru")}
-                            </span>
-                            <a href="#comments">
-                                <MessageCircle size={16} />
-                                {count}
-                            </a>
                             <button
                                 className={saved ? "liked" : ""}
                                 aria-pressed={saved}
@@ -226,10 +225,7 @@ export function Article() {
                                     );
                                 }}
                             >
-                                <Bookmark
-                                    size={17}
-                                    fill={saved ? "currentColor" : "none"}
-                                />
+                                <PostIcon name="bookmark" active={saved} />
                                 <span className="bookmark-word">
                                     {saved ? "Сохранено" : "В закладки"}
                                 </span>
@@ -250,7 +246,7 @@ export function Article() {
                                     }
                                 }}
                             >
-                                <Link2 size={17} />
+                                <PostIcon name="link" />
                             </button>
                         </div>
                         <div className="article-main">
@@ -276,14 +272,14 @@ export function Article() {
                                     <p>{brand.article.reactionText}</p>
                                 </div>
                                 <Button
-                                    busy={likeBusy}
-                                    variant={liked ? "primary" : "secondary"}
+                                    disabled={likeBusy}
+                                    aria-busy={likeBusy}
+                                    variant="secondary"
+                                    className={`post-like${liked ? " is-active" : ""}`}
+                                    aria-pressed={liked}
                                     onClick={like}
                                 >
-                                    <Heart
-                                        size={16}
-                                        fill={liked ? "currentColor" : "none"}
-                                    />
+                                    <PostIcon name="heart" active={liked} />
                                     {liked ? "Вам нравится" : "Нравится"} ·{" "}
                                     {post.likeCount}
                                 </Button>

@@ -11,15 +11,11 @@ import {
     ArrowDown,
     ArrowRight,
     ArrowUpRight,
-    Bookmark,
     Check,
     ChevronRight,
     Clock3,
     Cpu,
-    Eye,
     Flame,
-    Heart,
-    MessageCircle,
     Radio,
     Search,
     SlidersHorizontal,
@@ -40,6 +36,7 @@ import { tagTone } from "../themes/tones";
 import { matchesFeedFilters, commentInPublicTree } from "../mock/rules";
 import { Button, EmptyState, ScenarioState, Alert } from "../components/ui";
 import { PostPreview } from "../components/PostPreview";
+import { PostIcon } from "../components/PostIcon";
 
 const number = (value: number) =>
     new Intl.NumberFormat("ru", { notation: "compact" }).format(value);
@@ -54,6 +51,7 @@ export function PostCard({
     const navigate = useNavigate();
     const cat = store.categories.find((c) => post.categoryIds.includes(c.id));
     const saved = store.bookmarks.includes(post.id);
+    const [likeBusy, setLikeBusy] = useState(false);
     const comments = store.comments.filter(
         (c) => c.publicationId === post.id && c.state === "Visible",
     ).length;
@@ -84,10 +82,7 @@ export function PostCard({
                         );
                     }}
                 >
-                    <Bookmark
-                        size={18}
-                        fill={saved ? "currentColor" : "none"}
-                    />
+                    <PostIcon name="bookmark" active={saved} />
                 </button>
             </div>
             <h2>
@@ -141,10 +136,26 @@ export function PostCard({
                     Читать далее <ArrowRight size={15} />
                 </Link>
                 <div className="post-counters">
+                    <span
+                        title="Просмотры"
+                        aria-label={`Просмотры: ${post.viewCount}`}
+                    >
+                        <PostIcon name="views" />
+                        {number(post.viewCount)}
+                    </span>
+                    <Link
+                        to={`/posts/${post.slug}#comments`}
+                        aria-label={`Комментарии: ${comments}`}
+                    >
+                        <PostIcon name="comments" />
+                        {comments}
+                    </Link>
                     <button
                         aria-label={liked ? "Убрать лайк" : "Нравится"}
                         aria-pressed={liked}
-                        className={liked ? "liked" : ""}
+                        aria-busy={likeBusy}
+                        disabled={likeBusy}
+                        className={`post-like${liked ? " is-active" : ""}`}
                         onClick={async () => {
                             if (!store.authed) {
                                 navigate(
@@ -152,30 +163,19 @@ export function PostCard({
                                 );
                                 return;
                             }
+                            setLikeBusy(true);
                             try {
                                 await store.toggleLike(post.id);
                             } catch (e) {
                                 store.toast((e as Error).message, "error");
+                            } finally {
+                                setLikeBusy(false);
                             }
                         }}
                     >
-                        <Heart
-                            size={16}
-                            fill={liked ? "currentColor" : "none"}
-                        />
+                        <PostIcon name="heart" active={liked} />
                         {post.likeCount}
                     </button>
-                    <span title="Просмотры">
-                        <Eye size={16} />
-                        {number(post.viewCount)}
-                    </span>
-                    <Link
-                        to={`/posts/${post.slug}#comments`}
-                        aria-label={`Комментарии: ${comments}`}
-                    >
-                        <MessageCircle size={16} />
-                        {comments}
-                    </Link>
                 </div>
             </div>
         </article>
@@ -236,9 +236,9 @@ export function CommunityAside() {
                             <div>
                                 <h4>{post.title}</h4>
                                 <span>
-                                    <Eye size={12} />
+                                    <PostIcon name="views" />
                                     {number(post.viewCount)}
-                                    <Heart size={12} />
+                                    <PostIcon name="heart" />
                                     {post.likeCount}
                                 </span>
                             </div>
