@@ -2,9 +2,16 @@
 
 Дата: 2026-10-24. Constitution: 1.0.0. Scope этого изменения: Phase 10.
 
-**Статус: Phase 10 не закрыта — T121 / SC-005 заблокирован отсутствием
-выделенного стенда.** Пользователь подтвердил отсутствие стенда. Остальные
-задачи T114–T120 и T122–T125 завершены; следующая фаза не начиналась.
+**Статус: Phase 10 завершена в согласованном объёме; T114–T125 закрыты.**
+Решением владельца от 2026-10-24 нагрузочный SC-005 не требуется на текущем
+этапе проекта и для релиза 1.0.0. T121 закрыт по изменению объёма без прогона;
+успешная нагрузочная приёмка и показатели p95/p99 не заявляются.
+Следующая фаза не начиналась; публикация версии 1.0.0 этим отчётом не подтверждается.
+
+Изменение касается требований и документации. Исходные результаты проверок
+сохранены; полный нагрузочный прогон не выполнялся. После предоставления
+владельцем образа Identity отдельно выполнен реальный интеграционный smoke
+(результат ниже); production-код не менялся.
 
 ## Реализовано в Phase 10
 
@@ -16,6 +23,7 @@
 | T118 | Полный sc005-v1 / 20261024: 100 000 Published, 1 000 000 comments, 1 000 000 unique likes, aggregate 10 000 000 views, 10 000 users/1 000 authors, 200 categories/2 000 tags, 200 000/500 000 joins и нормативные частоты/размеры. Данные и повторная независимая генерация совпадают по canonical checksums всех таблиц. Seed проверяет одноразовую БД, migration/model/PG profile и прежний manifest; неизвестные данные не удаляет. |
 | T119 | Версионированный 400-slot план, каталог селективностей/ожидаемых результатов и checksums; ephemeral RSA/JWKS/JWT в памяти, 100 VU, 120 s warmup + 600 s measurement, request timeout 5 s и drain ≤30 s. Все попытки входят в nearest-rank percentiles/failures; общий и восемь feed variants проверяются отдельно. Ошибочный payload, недренированный блок, неверный стенд, недостающие SQL/метрики или изменённый dataset запрещают успех. Диагностический режим всегда отклоняет SC-005 acceptance. |
 | T120 | 736 HTTP/persistence SQL/EXPLAIN сценариев на полном seed, включая все 400 профильных запросов, обе сортировки/размеры/страницы, категории/теги/combined и max filters, workspace/moderation/roots/replies. Справочники проверены на 200/2 000 и отдельной полной копии с 2 000/20 000: default/20/100, first/middle/last/beyond, ties, один data SELECT, ≤pageSize+1 reader rows, четыре поля DTO, отсутствие tracking. Индекс (name,id) и его C collation проверены в PostgreSQL. Сохранены 787 файлов evidence; на двухстраничном списке middle совпадает с first. Новых индексов не потребовалось. |
+| T121 | Закрыт решением владельца от 2026-10-24: нагрузочный SC-005 исключён из обязательной приёмки текущего этапа/релиза 1.0.0. Прогон не выполнялся; benchmark, профиль и его критерии сохранены. |
 | T122 | Отдельные non-root Linux x64 Dockerfile API/Operator с проверенными amd64 digests SDK/runtime; deployment guide с credentials/key ring, reviewed SQL, backup/lock/rollout/recovery и ingress/health. Образы собраны и запущены. |
 | T123–T125 | Quickstart, README/database/deployment docs, итоговое ревью, матрица требований и этот отчёт. Доказательства и исходы команд сохранены в игнорируемом artifacts/. |
 
@@ -39,8 +47,9 @@ Schema SQL SHA-256: `dbabfdb7d18d6ea92528269dad4c46eb234889f47ffa7341d7d3ace0f83
 | pwsh -File scripts/validation/Invoke-MigrationValidation.ps1 -NoBuild | PASS; 10/10 tests, EF model drift отсутствует, reviewed idempotent SQL создан |
 | pwsh -File scripts/validation/Invoke-QueryInspection.ps1 -NoBuild | PASS; 3/3 tests, полный dataset/повторная генерация/SQL/plans/taxonomy copy |
 | Container smoke | PASS; API UID 1654, live=200/live, DB outage ready=503; Operator без config=5, с config без аргументов=2 |
+| Реальный Identity/Blog smoke | PASS; 25/25 проверок через `scripts/validation/Invoke-IdentityIntegrationSmoke.ps1`; реальные `danilovcpp/identity:latest` / `danilovcpp/blog:phase10`, одноразовые PG17/18.6 и Mailpit; cleanup PASS |
 | 100-VU diagnostic | 1200 запросов в полных блоках, 0 failures, response contract PASS; acceptance=false |
-| Полный SC-005 | **BLOCKED: выделенного Linux-стенда R-06 нет** |
+| Полный SC-005 | **ОТЛОЖЕН решением владельца от 2026-10-24; не требуется для текущего этапа/релиза 1.0.0. Прогон не выполнялся.** |
 
 Финальные результаты: [unit TRX](../../artifacts/test-results/phase10/unit-final.trx),
 [198 regression TRX](../../artifacts/test-results/phase10/integration-regression-final.trx),
@@ -54,6 +63,7 @@ Schema SQL SHA-256: `dbabfdb7d18d6ea92528269dad4c46eb234889f47ffa7341d7d3ace0f83
 [оценка фактических taxonomy plans](../../artifacts/validation/queries/taxonomy/assessment.md),
 [seed manifest/catalog/diagnostic](../../artifacts/performance/sc-005/preparation/),
 [container smoke](../../artifacts/validation/container-smoke.json),
+[real Identity smoke](../../artifacts/validation/live-identity/result.json),
 [полный отчёт](../../artifacts/validation/final-report.md).
 Предварительные red/regression TRX сохранены для диагностики; они заменены указанными
 финальными проверками после исправления замечаний.
@@ -80,10 +90,11 @@ guard counts в query tests и аргумент configuration EF wrapper. Под
 | II. Завершённый C# | PASS: async cancellation, NRT, build/format/analyzers; нет рабочих TODO/NotImplementedException. |
 | III. Данные | PASS: реальный PG18.6, вся migration chain, ограничения/права, bounded projections/SQL/plans, независимая expanded copy. |
 | IV. Контракты/безопасность | PASS: единый OpenAPI, строгие DTO, роли/versions/ProblemDetails, no-store; закрытый текст/секреты не раскрываются. |
-| V. Проверяемость | Автоматические gates PASS. **Общее завершение BLOCKED до SC-005**; написанный harness и diagnostic не заменяют приёмку. |
+| V. Проверяемость | Обязательные автоматические gates PASS. SC-005 исключён из текущей приёмки решением владельца; harness и diagnostic не подтверждают его прохождение. |
 | VI. Эксплуатация | PASS для автоматических fixtures/контейнеров: health/config/timeout/cancellation/shutdown, separate principals, non-root hosts, документированный deployment. |
 
-Блокирующих замечаний к проверенному коду не осталось. Блокировка выпуска — T121.
+Блокирующих замечаний к проверенному коду не осталось. T121 закрыт по изменению
+объёма; SC-005 не блокирует текущий этап/релиз 1.0.0.
 
 ## Покрытие требований
 
@@ -93,20 +104,42 @@ guard counts в query tests и аргумент configuration EF wrapper. Под
 | FR-012–017 | Reading filters/ties/pages/detail/counters, bounded queries и full seed | PASS |
 | FR-018–025 | Discussions/Moderation states/ownership/tree/ancestors/races/placeholders | PASS |
 | FR-026–031 | Likes/Views idempotency, multi-host concurrency, exact window, rollback/cleanup | PASS |
-| FR-032–038 | Реальный JWT/JWKS pipeline, local roles/bootstrap, Operator/audit/DB privileges | PASS в изолированных fixtures |
+| FR-032–038 | Реальный JWT/JWKS pipeline, local roles/bootstrap, Operator/audit/DB privileges; дополнительный smoke реальных Identity/Blog images | PASS в fixtures и одноразовом Development-окружении |
 | FR-039–040 | 35-operation consumer, OpenAPI/ProblemDetails/strict input/trace/cache | PASS |
 | FR-041–042 | Конфигурация одной установки, module graph, отсутствие дополнительных product features | PASS |
 | SC-001–004, SC-006–008 | Полные соответствующие story suites и итоговый consumer | PASS |
-| SC-005 / QR-001 | Data/query gates пройдены; 10-minute latency/failure acceptance на R-06 не выполнялась | **BLOCKED** |
+| QR-001 | Data/query gates, bounded SQL и проекции на полном seed пройдены | PASS |
+| SC-005 | 10-minute latency/failure acceptance на R-06 не выполнялась; требование снято для текущего этапа/релиза 1.0.0 | **ОТЛОЖЕН по решению владельца; T121 закрыт** |
 | QR-002–004 | Unit/real-PG HTTP/persistence/Operator, architecture/build/analyzers и runtime operations | PASS применимых автоматических gates |
 
-## Остаточная работа
+## Ограничения и возможные следующие проверки
 
-T121 остаётся `[ ]`. Нужен выделенный Linux x64 стенд: API 4 vCPU/8 GiB,
-PG 8 vCPU/16 GiB/NVMe, generator 2 vCPU/4 GiB, сеть ≥1 Gbit/s, одна API-реплика,
-без посторонней нагрузки. Требуются реальные stand metrics, SQL evidence,
-неукороченные 120 s +600 s, полный drain и все исходные thresholds.
-Локальный Docker имеет общие 16 GiB и не соответствует профилю.
+T121 закрыт без нагрузочного прогона по решению владельца от 2026-10-24.
+SC-005 не требуется на текущем этапе проекта и для релиза 1.0.0. Профиль R-06,
+seed, harness и все исходные thresholds сохранены для возможного будущего запуска;
+достижение p95/p99 и failure thresholds не подтверждено.
 
-Подключение к живому Identity и production rollout не выполнялись и не заявляются.
-Обязательная полнота MVP/Phase 10 не подтверждена до устранения SC-005 blocker.
+Тестовый `JwksFixture` по-прежнему служит для детерминированных unit/integration
+сценариев. Дополнительно 2026-10-24 выполнен smoke с реальным
+`danilovcpp/identity:latest`, digest
+`sha256:2d2019371e155137fd084c1f21e7877a0c78fa4b68a1d37f10a98ac74bc77580`,
+image ID `sha256:6f2d587befc5bded369a7ca71a637bdd5974a4f23182a6a5d47bba2f0884571f`.
+Blog image ID совпадает с опубликованным `danilovcpp/blog:phase10`:
+`sha256:f67ed3a60e890ebb3bcb37d8779ea4339c51b25b34c8c82a95d12cd4ba7ca170`.
+
+Команда: `pwsh -NoProfile -File scripts/validation/Invoke-IdentityIntegrationSmoke.ps1 -IdentityMigrationSql D:/Space/Personal/identity-service/migration.sql`.
+Все 25 проверок прошли: регистрация/SMTP/verification/login/profile, публичный JWKS
+и приём реального JWT Blog API, стабильный issuer/sub mapping и Reader bootstrap,
+запрет записи Reader, выдача Author через настоящий Operator и видимость с прежним
+JWT, создание/публикация, изоляция второго пользователя и foreign draft 404,
+wrong audience/issuer/signature 401, refresh/rotation, replay/family revocation,
+logout и отсутствие сгенерированных паролей/полученных токенов в контейнерных логах.
+После logout Identity profile возвращает 401, Blog продолжает принимать JWT
+до exp + clock skew согласно контракту локальной проверки без introspection.
+
+Smoke использует Development и loopback HTTP JWKS в общем network namespace,
+отдельные PostgreSQL 17/18.6 и Mailpit. Рабочие данные/настройки не использовались;
+одноразовые контейнеры, сеть и secret-файлы удалены (cleanup PASS). Проверка
+production HTTPS/ingress и production rollout не выполнялись и не заявляются.
+Phase 10/MVP завершены в согласованном объёме; релизные Git/Docker-теги 1.0.0
+этим изменением не создавались.

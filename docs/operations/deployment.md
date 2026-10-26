@@ -71,6 +71,43 @@ forward migration; production Down удаляет новые таблицы вм
 остановите запись, восстановите в новую БД, проверьте инварианты и переключите
 credentials после проверки. Никаких автоматических drop/recreate production БД.
 
-При SC-005 нужен отдельный стенд по quickstart; локальные Docker smoke/tests
-не подтверждают p95/p99. Реальный Identity и production rollout проверяются
-отдельно от одноразовых JWT/JWKS fixtures и в текущем отчёте не заявляются.
+SC-005 не является обязательным условием текущего этапа/релиза 1.0.0
+по решению владельца от 2026-10-24. Для возможного будущего прогона нужен
+отдельный стенд по quickstart; локальные Docker smoke/tests не подтверждают p95/p99.
+Интеграция с реальным образом Identity проверена отдельно от JWT/JWKS fixtures
+в одноразовом Development-окружении; production rollout не выполнялся.
+
+## Проверка реального Identity
+
+`scripts/validation/Invoke-IdentityIntegrationSmoke.ps1` запускает реальные образы
+Identity/Blog/Operator, отдельные PostgreSQL 17/18.6 и Mailpit. Нужны Docker,
+PowerShell 7.4+, полный SQL шести миграций Identity 1.1 и пяти миграций Blog,
+полученный из соответствующих версий исходников. Blog SQL создаётся проверкой
+`scripts/validation/Invoke-MigrationValidation.ps1`; Identity SQL передаётся явно.
+Образы должны быть доступны локально; при необходимости получите Identity
+через `docker pull danilovcpp/identity:latest`.
+
+```powershell
+pwsh -NoProfile -File scripts/validation/Invoke-IdentityIntegrationSmoke.ps1 `
+  -IdentityMigrationSql 'C:/path/to/identity/migration.sql' `
+  -BlogImage blog-engine-api:reviewed `
+  -OperatorImage blog-engine-operator:reviewed
+```
+
+Для проверки от 2026-10-24 использованы `danilovcpp/blog:phase10`,
+`blog-engine-operator:phase10` и `danilovcpp/identity:latest` с digest
+`sha256:2d2019371e155137fd084c1f21e7877a0c78fa4b68a1d37f10a98ac74bc77580`.
+Все 25 проверок прошли. Сценарий охватывает реальную регистрацию и подтверждение
+почты, login/profile, JWKS и приём JWT, стабильный issuer/sub mapping, изоляцию
+пользователей, локальные роли через Operator, создание/публикацию, wrong audience/
+issuer/signature, refresh/rotation/replay и logout. После logout Identity отклоняет
+профиль, а локально проверяемый JWT Blog остаётся допустим до exp + clock skew;
+это существующий контракт без introspection.
+
+HTTP-порты привязаны только к loopback; оба API работают в Development.
+Blog и Identity делят network namespace для разрешённого loopback HTTP JWKS.
+Это проверка совместимости реальных образов; production HTTPS/ingress этим
+сценарием не проверяются. Пароли, ключи и токены генерируются для одноразовой
+установки; отчёт содержит только безопасные результаты и image/schema hashes.
+Сценарий удаляет свои контейнеры, сеть и временные secret-файлы.
+Результат: `artifacts/validation/live-identity/result.json`.

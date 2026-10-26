@@ -4,8 +4,9 @@
 
 **Feature context**: `001-blog-engine-mvp` — значение `BRANCH` setup-plan из имени каталога; это не Git-ветка.
 
-**Status**: Истории Phase 1–9 реализованы; Phase 10 выполняет итоговые gates.
-SC-005 заблокирован отсутствием выделенного стенда. Фактические проверки и статус:
+**Status**: Phase 1–10 завершены в согласованном объёме. Решением владельца
+от 2026-10-24 SC-005 исключён из обязательной приёмки текущего этапа/релиза 1.0.0;
+T121 закрыт без нагрузочного прогона. Фактические проверки и статус:
 [implementation-report.md](implementation-report.md).
 
 **Input**: `specs/001-blog-engine-mvp/spec.md`, согласованные Q1–Q3, [исходные ограничения](references/source-constraints.md), Identity 1.1.0, конституция 1.0.0.
@@ -38,8 +39,10 @@ WebApplicationFactory 10.0.13, Testcontainers.PostgreSql 4.16.0, реальны�
 
 **Project Type**: web-service и отдельный эксплуатационный CLI.
 
-**Performance Goals**: SC-005: p95 <=1 s, p99 <=2 s, unexpected failures <=1%
-при 100 параллельных читателях/10 min; bounded feed queries без N+1.
+**Performance Goals**: bounded feed queries без N+1 остаются обязательными.
+Нагрузочные цели SC-005 отложены решением владельца от 2026-10-24 и не блокируют
+текущий этап/релиз 1.0.0: p95 <=1 s, p99 <=2 s, unexpected failures <=1%
+при 100 параллельных читателях/10 min; их достижение не подтверждено.
 Стенд и базовые доли запросов зафиксированы в R-06. Нормативный `sc005-v1`
 (seed 20261024, Markdown 70/25/5% по 2/16/128 KiB, 200 categories/2 000 tags,
 точные частоты назначений и 87,5% непустых/12,5% пустых ответов) задан в
@@ -186,7 +189,7 @@ connection/transaction без независимых commits. Lock order опи�
 | Требования | Реализация/обязательные проверки |
 |---|---|
 | FR-001–011, SC-001 | lifecycle, slug/first publish, UTF-8/URL/лимиты, assignment/delete races, tombstone uniqueness, версии/rollback; unit + HTTP + DB |
-| FR-010/012–017, QR-001, SC-005/006 | public/workspace/taxonomy, any/all filters, ties/pages, author refs; feed SQL <=5, taxonomy SQL =1, проекции/EXPLAIN/index evidence T120; read benchmark по sc005-v1 |
+| FR-010/012–017, QR-001, SC-006 | public/workspace/taxonomy, any/all filters, ties/pages, author refs; feed SQL <=5, taxonomy SQL =1, проекции/EXPLAIN/index evidence T120; нагрузочный SC-005 отложен и не входит в текущую приёмку |
 | FR-018–025, SC-002/006 | depth/cross-parent/cycles, корни/дети, hide/restore/delete/ancestor counts, версии, заглушки, parent state races |
 | FR-026–031, SC-003/004 | 100 concurrent likes/views, mixed users, repeat remove, exact 24h, no sliding, auth/anonymous, cleanup race, multi-host общий DB/keyring, rollback |
 | FR-032–038, SC-007 | role/action/ownership matrix, JWT/claims/isolation, JWKS rotation/outage/flood, bootstrap, next-operation roles, CLI/audit/DB privileges |
