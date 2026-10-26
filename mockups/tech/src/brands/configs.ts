@@ -1,3 +1,5 @@
+import { retrotechPhrases } from "./retrotechPhrases.ts";
+
 /** Deployment branding is data. Shared pages do not own a brand or a subject. */
 const retrotech = {
     presentation: "workshop",
@@ -34,6 +36,7 @@ const retrotech = {
             "Место для тех, кто чинит,",
             "а не выбрасывает.",
         ],
+        stripPhrases: retrotechPhrases,
         asideEyebrow: "СООБЩЕСТВО ЭНТУЗИАСТОВ",
         asideTitle: ["Хорошая техника", "заслуживает", "второй жизни."],
         asideText:
@@ -169,6 +172,7 @@ const generic: typeof retrotech = {
             "Сообщество людей,",
             "которым интересно.",
         ],
+        stripPhrases: [],
         asideEyebrow: "ВАШЕ СООБЩЕСТВО",
         asideTitle: ["Хорошим идеям", "нужны", "собеседники."],
         asideText:

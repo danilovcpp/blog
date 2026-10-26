@@ -37,6 +37,7 @@ import { matchesFeedFilters, commentInPublicTree } from "../mock/rules";
 import { Button, EmptyState, ScenarioState, Alert } from "../components/ui";
 import { PostPreview } from "../components/PostPreview";
 import { PostIcon } from "../components/PostIcon";
+import { TypewriterText } from "../components/TypewriterText";
 
 const number = (value: number) =>
     new Intl.NumberFormat("ru", { notation: "compact" }).format(value);
@@ -458,7 +459,11 @@ export function Journal() {
                     <span>
                         <Radio size={18} />
                         <strong>{brand.feed.strip[0]}</strong>
-                        <i>{brand.feed.strip[1]}</i>
+                        {brand.feed.stripPhrases.length ? (
+                            <TypewriterText phrases={brand.feed.stripPhrases} />
+                        ) : (
+                            <i>{brand.feed.strip[1]}</i>
+                        )}
                     </span>
                     <div>
                         <span className="avatar-stack">

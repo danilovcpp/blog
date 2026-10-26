@@ -1,0 +1,65 @@
+.community-strip i.typewriter {
+    display: inline-grid;
+}
+.community-strip > span:has(.typewriter) > svg,
+.community-strip > span:has(.typewriter) > strong {
+    flex-shrink: 0;
+}
+.typewriter-visual,
+.typewriter-sizer {
+    display: inline-grid;
+}
+.typewriter-sizer,
+.typewriter-line,
+.typewriter-sizer > span {
+    grid-area: 1 / 1;
+    white-space: nowrap;
+}
+.typewriter-sizer {
+    visibility: hidden;
+    padding-right: 0.65em;
+}
+.typewriter-line {
+    justify-self: start;
+}
+.typewriter-cursor {
+    display: inline-block;
+    width: 1px;
+    height: 1em;
+    margin-left: 3px;
+    background: var(--accent);
+    vertical-align: -0.12em;
+    animation: typewriter-blink 1s steps(1) infinite;
+}
+@keyframes typewriter-blink {
+    50% {
+        opacity: 0;
+    }
+}
+@media (max-width: 1150px) {
+    .community-strip > span:has(.typewriter) {
+        display: grid;
+        grid-template-columns: 18px auto;
+        column-gap: 10px;
+        row-gap: 3px;
+    }
+    .community-strip i.typewriter {
+        grid-column: 2;
+        padding-left: 0;
+        border-left: 0;
+    }
+}
+@media (max-width: 760px) {
+    .community-strip:has(.typewriter) {
+        flex-wrap: wrap;
+    }
+    .community-strip > span:has(.typewriter) {
+        flex-basis: 100%;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .typewriter-cursor {
+        animation: none;
+        visibility: hidden;
+    }
+}
