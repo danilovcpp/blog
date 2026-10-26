@@ -1,0 +1,73 @@
+/* Shared color treatments; presentation files only own their size and shape. */
+[data-tone="blue"] {
+    --tone-ink: var(--tone-blue-ink);
+    --tone-bg: var(--tone-blue-bg);
+    --tone-border: var(--tone-blue-border);
+}
+[data-tone="orange"] {
+    --tone-ink: var(--tone-orange-ink);
+    --tone-bg: var(--tone-orange-bg);
+    --tone-border: var(--tone-orange-border);
+}
+[data-tone="red"] {
+    --tone-ink: var(--tone-red-ink);
+    --tone-bg: var(--tone-red-bg);
+    --tone-border: var(--tone-red-border);
+}
+[data-tone="green"] {
+    --tone-ink: var(--tone-green-ink);
+    --tone-bg: var(--tone-green-bg);
+    --tone-border: var(--tone-green-border);
+}
+[data-tone="purple"] {
+    --tone-ink: var(--tone-purple-ink);
+    --tone-bg: var(--tone-purple-bg);
+    --tone-border: var(--tone-purple-border);
+}
+
+:is(
+    .post-tag,
+    .side-tags a,
+    .article-tags a,
+    .large-tags a,
+    .filter-chip,
+    .badge,
+    .alert,
+    .toast
+)[data-tone] {
+    color: var(--tone-ink);
+    background: var(--tone-bg);
+    border: 1px solid var(--tone-border);
+}
+.post-tag[data-tone] {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 4px;
+    line-height: 1.5;
+}
+:is(
+        .post-tag,
+        .side-tags a,
+        .article-tags a,
+        .large-tags a,
+        .filter-chip
+    )[data-tone]:hover:not(:disabled) {
+    color: var(--tone-ink);
+    background: color-mix(in srgb, var(--tone-ink) 9%, var(--tone-bg));
+    border-color: var(--tone-ink);
+}
+.filter-chip[data-tone].active {
+    border-color: var(--tone-ink);
+    box-shadow: inset 0 0 0 1px var(--tone-ink);
+    font-weight: 600;
+}
+.filter-chip[data-tone]:focus-visible {
+    outline-color: var(--tone-ink);
+}
+.alert[data-tone] > span {
+    color: var(--tone-ink);
+}
+.article-tags {
+    flex-wrap: wrap;
+}
