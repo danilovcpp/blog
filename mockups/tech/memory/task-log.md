@@ -306,3 +306,23 @@
   тесты и production-сборки blueprint/midnight не повторялись: UI-задача.
   Сохраняется предупреждение chunk >500 kB. Границы проверки — в verification.
 - Продолжение: нет.
+
+## 2026-10-27 — Сборка зелёного РетроТех Лаб для VPS
+
+- Запрос: подготовить прототип из mockups/tech для загрузки на VPS,
+  тема РетроТех Лаб, зелёная.
+- Результат: готовый ZIP `artifacts/retrotech-workshop-vps-20261027-065303-200.zip`
+  (путь от корня репозитория) и SHA256; внутри site/, Nginx, инструкция,
+  build-info. Добавлена команда npm run package:vps с явным выбором
+  workshop/retrotech независимо от env. Задача завершена.
+- Файлы: package.json, scripts/package-vps.ps1, deploy/nginx.conf,
+  deploy/README.md, README.md, docs/verification.md, MEMORY.md, memory/task-log.md.
+- Проверка: TypeScript/Vite, 6/6 контрактных тестов, структура ZIP/распаковка/
+  SHA256, совпадение финальной статики с просмотренной, PowerShell AST,
+  Prettier и git diff --check. В Chrome на распакованном пакете — зелёная
+  тема, фильтры, прямое открытие/обновление шести маршрутов, включая статью;
+  главная/login 390 px без переполнения, ошибок JS/ресурсов/внешних запросов нет.
+  Фактически пройдены статья, login, register, topics, about, prototype.
+  Nginx/VPS не запускались: nginx отсутствует, Docker daemon недоступен;
+  шаблон сверялся по документации. Сохранилось предупреждение chunk >500 kB.
+- Продолжение: загрузка и применение конфигурации на VPS выполняются пользователем.

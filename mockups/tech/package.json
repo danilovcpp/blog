@@ -8,6 +8,7 @@
     "dev:generic": "vite --host 127.0.0.1 --port 5175 --mode generic",
     "build": "tsc -b && vite build",
     "build:generic": "tsc -b && vite build --mode generic --outDir dist-generic",
+    "package:vps": "pwsh -NoProfile -File scripts/package-vps.ps1",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "format": "prettier --write src tests vite.config.ts"
