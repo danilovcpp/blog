@@ -16,7 +16,7 @@ export const themes = {
             ink: "#1f1f1f",
             muted: "#737373",
             line: "#e8e8e8",
-            accent: "#1677ff",
+            accent: "#1668dc",
             soft: "#e6f4ff",
             hero: "#f0f5ff",
             amber: "#d48806",

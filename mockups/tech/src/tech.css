@@ -18,7 +18,8 @@ h2,
 h3 {
     font-weight: 650;
 }
-a:hover {
+/* Component foregrounds take precedence over the default link hover color. */
+a:where(:hover) {
     color: var(--accent);
 }
 .eyebrow {
@@ -233,7 +234,7 @@ a:hover {
     padding-top: 26px;
 }
 .workshop-hero {
-    height: 350px;
+    height: auto;
     border-radius: 10px;
     overflow: hidden;
     position: relative;
@@ -245,7 +246,7 @@ a:hover {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center 54%;
+    object-position: center 35%;
 }
 .workshop-hero-shade {
     position: absolute;
@@ -253,16 +254,15 @@ a:hover {
     background: linear-gradient(
         90deg,
         var(--hero) 0%,
-        color-mix(in srgb, var(--hero) 97%, transparent) 25%,
-        color-mix(in srgb, var(--hero) 75%, transparent) 39%,
-        transparent 64%
+        color-mix(in srgb, var(--hero) 97%, transparent) 31%,
+        color-mix(in srgb, var(--hero) 75%, transparent) 45%,
+        transparent 70%
     );
 }
 .workshop-hero-copy {
     position: relative;
     padding: 33px 38px;
     width: 57%;
-    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -296,30 +296,17 @@ a:hover {
 }
 .workshop-hero p {
     font-size: 12px;
-    line-height: 1.75;
-    opacity: 0.8;
+    max-width: 40ch;
+    line-height: 1.5;
+    opacity: 1;
 }
 .workshop-hero .button {
     margin-top: 19px;
     min-height: 38px;
     padding: 8px 18px;
 }
-.hero-caption {
-    display: flex;
-    gap: 7px;
-    align-items: center;
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: auto;
-}
-.hero-image-credit {
-    position: absolute;
-    bottom: 16px;
-    right: 20px;
-    color: #fffceb;
-    font-size: 12px;
-    letter-spacing: 1.6px;
-    opacity: 0.85;
+[data-presentation="workshop"] .workshop-hero p {
+    text-wrap: balance;
 }
 .community-strip {
     display: flex;
@@ -327,7 +314,7 @@ a:hover {
     align-items: center;
     border-bottom: 1px solid var(--line);
     padding: 19px 2px;
-    margin-bottom: 31px;
+    margin-bottom: 8px;
     gap: 15px;
 }
 .community-strip > span {
@@ -475,7 +462,9 @@ a:hover {
     white-space: nowrap;
     background: color-mix(in srgb, var(--ink) 8%, var(--surface));
     color: var(--ink);
-    transition: background-color 0.16s, color 0.16s;
+    transition:
+        background-color 0.16s,
+        color 0.16s;
 }
 .tech-topic-strip > a.active {
     background: var(--accent);
@@ -2103,9 +2092,6 @@ a:hover {
         grid-template-columns: minmax(0, 1fr) 310px;
         gap: 32px;
     }
-    .workshop-hero {
-        height: 375px;
-    }
     .workshop-hero h1 {
         font-size: 54px;
     }
@@ -2166,9 +2152,6 @@ a:hover {
     .workshop-hero h1 {
         font-size: 46px;
     }
-    .workshop-hero {
-        height: 340px;
-    }
     .article-header h1 {
         font-size: 33px;
     }
@@ -2218,9 +2201,6 @@ a:hover {
     }
     .workshop-hero-copy {
         padding: 30px;
-    }
-    .workshop-hero {
-        height: 330px;
     }
     .workshop-hero h1 {
         font-size: 44px;
@@ -2374,7 +2354,6 @@ a:hover {
         padding-top: 16px;
     }
     .workshop-hero {
-        height: 340px;
         border-radius: 8px;
     }
     .workshop-hero > img {
@@ -2384,8 +2363,8 @@ a:hover {
         background: linear-gradient(
             90deg,
             var(--hero) 0%,
-            color-mix(in srgb, var(--hero) 95%, transparent) 30%,
-            color-mix(in srgb, var(--hero) 70%, transparent) 57%,
+            color-mix(in srgb, var(--hero) 95%, transparent) 35%,
+            color-mix(in srgb, var(--hero) 70%, transparent) 62%,
             transparent 100%
         );
     }
@@ -2405,16 +2384,9 @@ a:hover {
         font-size: 12px;
         letter-spacing: 1.4px;
     }
-    .hero-caption {
-        font-size: 12px;
-        max-width: 190px;
-    }
-    .hero-image-credit {
-        display: none;
-    }
     .community-strip {
         padding: 17px 0;
-        margin-bottom: 24px;
+        margin-bottom: 8px;
     }
     .community-strip > span {
         font-size: 12px;
@@ -2728,9 +2700,6 @@ a:hover {
     .container {
         width: calc(100% - 26px);
     }
-    .workshop-hero {
-        height: 333px;
-    }
     .workshop-hero-copy {
         width: 92%;
         padding: 24px 20px;
@@ -2745,12 +2714,9 @@ a:hover {
         background: linear-gradient(
             90deg,
             var(--hero) 0%,
-            color-mix(in srgb, var(--hero) 94%, transparent) 35%,
-            color-mix(in srgb, var(--hero) 52%, transparent) 85%
+            color-mix(in srgb, var(--hero) 94%, transparent) 45%,
+            color-mix(in srgb, var(--hero) 80%, transparent) 100%
         );
-    }
-    .hero-caption {
-        margin-top: 21px;
     }
     .community-strip > div {
         gap: 7px;
@@ -3144,13 +3110,7 @@ input[type="checkbox"] {
     letter-spacing: 1.4px;
 }
 .workshop-hero p {
-    font-size: 15px;
-}
-.hero-caption {
-    font-size: 12px;
-}
-.workshop-hero {
-    height: 370px;
+    font-size: 20px;
 }
 .workshop-hero-copy {
     padding-top: 32px;
@@ -3668,15 +3628,12 @@ input[type="checkbox"] {
         width: 65%;
     }
     .workshop-hero p {
-        font-size: 14px;
+        font-size: 18px;
     }
 }
 @media (max-width: 950px) {
     .header-search {
         display: none;
-    }
-    .workshop-hero {
-        height: 355px;
     }
     .workshop-hero-copy {
         width: 68%;
@@ -3684,9 +3641,6 @@ input[type="checkbox"] {
     }
     .workshop-hero h1 {
         font-size: 43px;
-    }
-    .hero-caption {
-        font-size: 11px;
     }
     .community-strip > a {
         font-size: 11px;
@@ -3726,18 +3680,12 @@ input[type="checkbox"] {
     .workshop-hero-copy {
         width: 83%;
     }
-    .workshop-hero {
-        height: 355px;
-    }
     .hero-eyebrow {
         font-size: 9px;
         letter-spacing: 1px;
     }
-    .hero-caption {
-        font-size: 12px;
-    }
     .workshop-hero p {
-        font-size: 14px;
+        font-size: 16px;
     }
     .workshop-hero .button {
         font-size: 14px;
@@ -3872,20 +3820,12 @@ input[type="checkbox"] {
         width: 100%;
         padding: 24px 20px;
     }
-    .workshop-hero {
-        height: 360px;
-    }
     .workshop-hero h1 {
         font-size: 40px;
     }
     .workshop-hero p {
-        font-size: 14px;
-        max-width: 260px;
-    }
-    .hero-caption {
-        font-size: 11px;
-        max-width: 260px;
-        margin-top: 22px;
+        font-size: 16px;
+        max-width: 100%;
     }
     .community-strip > div {
         font-size: 10px;

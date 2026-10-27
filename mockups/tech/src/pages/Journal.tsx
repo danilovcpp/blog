@@ -388,13 +388,7 @@ export function Journal() {
                         <a className="button button-primary" href="#feed">
                             {brand.hero.button} <ArrowRight size={17} />
                         </a>
-                        <span className="hero-caption">
-                            <Radio size={14} /> {brand.hero.caption}
-                        </span>
                     </div>
-                    <span className="hero-image-credit">
-                        {brand.hero.credit}
-                    </span>
                 </section>
             )}
             {!home && (

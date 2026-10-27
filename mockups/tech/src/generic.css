@@ -87,13 +87,14 @@ html[data-presentation="ant"] {
     box-shadow: 0 2px 0 #0580ff0f;
 }
 [data-presentation="ant"] .button-primary:hover {
-    background: #4096ff;
+    background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+    border-color: color-mix(in srgb, var(--accent) 88%, var(--ink));
     filter: none;
     color: #fff;
 }
 [data-presentation="ant"] .button-secondary:hover {
-    border-color: #4096ff;
-    color: #4096ff;
+    border-color: var(--accent);
+    color: var(--accent);
     background: var(--surface);
 }
 [data-presentation="ant"] .badge {
@@ -141,8 +142,7 @@ html[data-presentation="ant"] {
     border-radius: 8px;
 }
 [data-presentation="ant"] .workshop-hero > img,
-[data-presentation="ant"] .workshop-hero-shade,
-[data-presentation="ant"] .hero-image-credit {
+[data-presentation="ant"] .workshop-hero-shade {
     display: none;
 }
 [data-presentation="ant"] .workshop-hero-copy {
@@ -178,9 +178,6 @@ html[data-presentation="ant"] {
 }
 [data-presentation="ant"] .workshop-hero .button {
     margin-top: 20px;
-}
-[data-presentation="ant"] .hero-caption {
-    display: none;
 }
 [data-presentation="ant"] .community-strip {
     padding: 16px 0;
@@ -218,7 +215,7 @@ html[data-presentation="ant"] {
 [data-presentation="ant"] .tech-topic-strip > a.active {
     background: #e6f4ff;
     border-color: #91caff;
-    color: #1677ff;
+    color: var(--accent);
     box-shadow: none;
 }
 [data-presentation="ant"] .tech-post {
@@ -252,7 +249,7 @@ html[data-presentation="ant"] {
 }
 [data-presentation="ant"] .person-avatar {
     background: #e6f4ff;
-    color: #1677ff;
+    color: var(--accent);
 }
 [data-presentation="ant"] .avatar-ochre {
     background: #fff7e6;
@@ -260,14 +257,14 @@ html[data-presentation="ant"] {
 }
 [data-presentation="ant"] .category-label {
     background: #e6f4ff;
-    color: #1677ff;
+    color: var(--accent);
     border: 1px solid #91caff;
     padding: 1px 7px;
 }
 [data-presentation="ant"] .read-more {
     border: 0;
     padding: 0;
-    color: #1677ff;
+    color: var(--accent);
     font-size: 14px;
     font-weight: 400;
 }
@@ -418,7 +415,7 @@ html[data-presentation="ant"] {
 }
 [data-presentation="ant"] .app-sidebar nav a.active {
     background: #e6f4ff;
-    color: #1677ff;
+    color: var(--accent);
 }
 [data-presentation="ant"] .workspace-summary strong {
     font-family: var(--serif);
@@ -472,7 +469,7 @@ html[data-presentation="ant"] {
     color: #1f1f1f;
 }
 [data-presentation="ant"] .auth-visual .logo-mark {
-    color: #1677ff;
+    color: var(--accent);
 }
 [data-presentation="ant"] .auth-visual-copy {
     bottom: 25%;
@@ -487,7 +484,7 @@ html[data-presentation="ant"] {
     color: #1f1f1f;
 }
 [data-presentation="ant"] .auth-visual-copy h2 em {
-    color: #1677ff;
+    color: var(--accent);
 }
 [data-presentation="ant"] .auth-visual-copy p,
 [data-presentation="ant"] .auth-visual-bottom {
@@ -505,7 +502,7 @@ html[data-presentation="ant"] {
     min-height: 40px;
 }
 [data-presentation="ant"] .auth-star {
-    color: #1677ff;
+    color: var(--accent);
     font-size: 25px;
 }
 [data-presentation="ant"] .prototype-section h2 {
