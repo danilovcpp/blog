@@ -6,11 +6,19 @@
 - `deck.png`: кассетная дека с открытым корпусом, 1536 × 1024.
 - `circuit.png`: винтажный усилитель и компоненты платы, 1536 × 1024.
 - `retrotech-hero.png`: первая версия панорамного баннера мастерской по приложенному пользователем референсу, 2172 × 724. Сохранена как исходник исправления.
-- `retrotech-hero-v2.png`: текущий hero РетроТех/workshop, 2172 × 724. В строке «Это история.» исправлены две рукописные «т» — у каждой три штриха. Старое workshop.png используется для статей и входа.
+- `retrotech-hero-v2.png`: текущий hero РетроТех/workshop, 2172 × 724. В строке «Это история.» исправлены две рукописные «т» — у каждой три штриха. Старое workshop.png используется для статей.
+- `retrotech-auth-workshop.webp`: фон страниц аккаунта РетроТех/workshop по `../../references/login.png`, 1122 × 1402, около 208 KiB. Создан встроенным image_gen, конвертирован из PNG в WebP с качеством 88 без изменения композиции. Формы, логотипы и дорожки поверх изображения реализованы в HTML/SVG.
 
 Референсы пользователя из `references/` изучены как визуальное направление. Они не используются как готовый интерфейс. Для нового баннера референс передан в image_gen и сохранён как `../../references/retrotech-hero-reference.png`; элементы сайта поверх референса в новую иллюстрацию не включены.
 
 ## Финальные промпты (built-in image_gen)
+
+### retrotech-auth-workshop.webp — 2026-10-27
+
+Референс: `../../references/login.png`. Встроенный image_gen; исходный интерфейс референса не входит в фон. Итоговый промпт:
+
+Use case: photorealistic-natural. Asset type: full-page background photograph for a vintage electronics community login page, portrait 1200x1500. Input image 1 is a composition and atmosphere reference only: recreate the WORKSHOP PHOTOGRAPH visible beneath the website interface. Remove ALL website UI: no header, no footer, no login panel, no boxes, no icons, no circuit decorations, no overlay text, no logo, no stats. Reconstruct the room naturally where the UI was. Match this reference's warm sunlit vintage electronics workshop: a large wood and black Soviet portable radio on a worn wooden workbench in the LOWER LEFT foreground, green metal desk lamp at left, neatly stacked old electronics books, hand tools, components, glowing green oscilloscope behind the radio, a cream mug on the table near center, softly blurred wooden shelves and green plants in the back. Preserve the calm luminous pale cream wall and window light across the UPPER LEFT and upper middle, with generous bright negative space in the upper 60 percent for HTML text; the detailed workbench/radio sits in the bottom 35 percent. The right upper portion can show softly blurred shelves but no strong focal points. Real aged wood, brushed metal, warm amber sunlight, sage and forest green accents, tactile editorial photography, natural perspective. Frame the entire radio with breathing room; desk extends across the bottom. No people, no watermarks, no legible text, no typography, no collage, no UI. It should look very close to the background setting in the supplied reference.
+
 
 ### retrotech-hero-v2.png — 2026-10-27
 

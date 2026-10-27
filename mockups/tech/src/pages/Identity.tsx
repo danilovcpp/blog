@@ -23,9 +23,10 @@ import {
     Smartphone,
     Trash2,
     User,
+    UserRoundPlus,
     X,
 } from "lucide-react";
-import { Logo } from "../components/Layout";
+import { AuthFrame, AuthSecurity, CircuitLines } from "../components/AuthFrame";
 import {
     Alert,
     Badge,
@@ -37,7 +38,6 @@ import {
 } from "../components/ui";
 import { useMock, delay } from "../mock/store";
 import { formatDate } from "../mock/data";
-import { theme } from "../themes";
 import { passwordProblem } from "../mock/rules";
 
 type AuthKind =
@@ -123,6 +123,7 @@ export function PasswordInput({
     autoComplete = "new-password",
     error,
     placeholder = "Не меньше 15 символов",
+    leadingIcon = false,
 }: {
     id: string;
     value: string;
@@ -130,10 +131,14 @@ export function PasswordInput({
     autoComplete?: string;
     error?: boolean;
     placeholder?: string;
+    leadingIcon?: boolean;
 }) {
     const [show, setShow] = useState(false);
     return (
-        <div className="password-input">
+        <div
+            className={`password-input ${leadingIcon ? "auth-input-icon" : ""}`}
+        >
+            {leadingIcon && <LockKeyhole size={20} aria-hidden="true" />}
             <input
                 id={id}
                 type={show ? "text" : "password"}
@@ -196,6 +201,10 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
         return () => clearTimeout(timer);
     }, [cooldown]);
     const cfg = configs[kind];
+    const referenceAuth = brand.presentation === "workshop";
+    const authQuery = params.get("returnTo")
+        ? `?${new URLSearchParams({ returnTo: params.get("returnTo")! })}`
+        : "";
     const linkFlow = [
         "verify-email",
         "reset-password",
@@ -328,33 +337,18 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
         kind === "session-expired" ||
         kind === "deactivated";
     return (
-        <main className="auth-layout">
-            <aside className="auth-visual">
-                <img src={theme.auth} alt={theme.authAlt} />
-                <div className="auth-visual-shade" />
-                <Logo light />
-                <div className="auth-visual-copy">
-                    <span className="auth-star">✳</span>
-                    <h2>
-                        {brand.auth.quote[0]}
-                        <br />
-                        {brand.auth.quote[1]}
-                        <br />
-                        <em>
-                            {brand.auth.quote[2]}
-                            <br />
-                            {brand.auth.quote[3]}
-                        </em>
-                    </h2>
-                    <p>{brand.auth.subtitle}</p>
-                </div>
-                <span className="auth-visual-bottom">{brand.tagline}</span>
-            </aside>
+        <AuthFrame>
             <section className="auth-right">
                 <Link className="auth-back" to="/">
                     <ArrowLeft size={16} />В ленту
                 </Link>
                 <div className="auth-form-wrap">
+                    {referenceAuth && (
+                        <>
+                            <CircuitLines className="auth-circuit-card auth-circuit-card-left" />
+                            <CircuitLines className="auth-circuit-card auth-circuit-card-right" />
+                        </>
+                    )}
                     <span className="eyebrow">{cfg.eyebrow}</span>
                     {linkFlow && !validLink && !success ? (
                         <>
@@ -447,10 +441,44 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                         </>
                     ) : (
                         <>
-                            <h1>{cfg.title}</h1>
+                            <h1>
+                                {referenceAuth && kind === "login"
+                                    ? brand.auth.welcomeTitle
+                                    : cfg.title}
+                            </h1>
                             <p className="auth-description">
-                                {cfg.description}
+                                {referenceAuth && kind === "login"
+                                    ? "Войдите в свой аккаунт или создайте новый, чтобы стать частью нашего сообщества."
+                                    : cfg.description}
                             </p>
+                            {referenceAuth &&
+                                (kind === "login" || kind === "register") && (
+                                    <nav
+                                        className="auth-tabs"
+                                        aria-label="Доступ к аккаунту"
+                                    >
+                                        <Link
+                                            to={`/auth/login${authQuery}`}
+                                            aria-current={
+                                                kind === "login"
+                                                    ? "page"
+                                                    : undefined
+                                            }
+                                        >
+                                            Вход
+                                        </Link>
+                                        <Link
+                                            to={`/auth/register${authQuery}`}
+                                            aria-current={
+                                                kind === "register"
+                                                    ? "page"
+                                                    : undefined
+                                            }
+                                        >
+                                            Регистрация
+                                        </Link>
+                                    </nav>
+                                )}
                             {staticState ? (
                                 <>
                                     <span className="auth-state-icon">
@@ -513,17 +541,37 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                                             required
                                             error={errors.email}
                                         >
-                                            <input
-                                                id="auth-email"
-                                                type="email"
-                                                autoComplete="username"
-                                                value={email}
-                                                onChange={(e) =>
-                                                    setEmail(e.target.value)
+                                            <div
+                                                className={
+                                                    referenceAuth
+                                                        ? "auth-input-icon"
+                                                        : undefined
                                                 }
-                                                placeholder="you@example.com"
-                                                aria-invalid={!!errors.email}
-                                            />
+                                            >
+                                                {referenceAuth && (
+                                                    <Mail
+                                                        size={20}
+                                                        aria-hidden="true"
+                                                    />
+                                                )}
+                                                <input
+                                                    id="auth-email"
+                                                    type="email"
+                                                    autoComplete="username"
+                                                    value={email}
+                                                    onChange={(e) =>
+                                                        setEmail(e.target.value)
+                                                    }
+                                                    placeholder={
+                                                        referenceAuth
+                                                            ? "Например: ivan@mail.ru"
+                                                            : "you@example.com"
+                                                    }
+                                                    aria-invalid={
+                                                        !!errors.email
+                                                    }
+                                                />
+                                            </div>
                                         </Field>
                                     )}
                                     {hasPassword && (
@@ -552,9 +600,10 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                                                         : "new-password"
                                                 }
                                                 error={!!errors.password}
+                                                leadingIcon={referenceAuth}
                                                 placeholder={
                                                     kind === "login"
-                                                        ? "Ваш пароль"
+                                                        ? "Введите пароль"
                                                         : "Например, длинная любимая фраза"
                                                 }
                                             />
@@ -590,6 +639,7 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                                                     id="auth-confirmation"
                                                     value={confirmation}
                                                     onChange={setConfirmation}
+                                                    leadingIcon={referenceAuth}
                                                     error={
                                                         !!errors.confirmation
                                                     }
@@ -603,7 +653,7 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                                             className="forgot-link"
                                             to="/auth/forgot-password"
                                         >
-                                            Не помните пароль?
+                                            Забыли пароль?
                                         </Link>
                                     )}
                                     {error && (
@@ -618,7 +668,9 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                                         {cooldown
                                             ? `Повторить через ${cooldown} с`
                                             : kind === "login"
-                                              ? `Войти в ${brand.shortName}`
+                                              ? referenceAuth
+                                                  ? "Войти"
+                                                  : `Войти в ${brand.shortName}`
                                               : kind === "register"
                                                 ? "Создать аккаунт"
                                                 : kind === "verify-email"
@@ -647,11 +699,33 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                             )}
                             {kind === "login" && (
                                 <>
+                                    {referenceAuth && (
+                                        <div className="auth-divider">
+                                            Ещё нет аккаунта?
+                                        </div>
+                                    )}
                                     <p className="auth-switch">
-                                        Пока нет аккаунта?{" "}
-                                        <Link to="/auth/register">
-                                            Присоединиться{" "}
-                                            <ArrowUpRight size={13} />
+                                        {!referenceAuth &&
+                                            "Пока нет аккаунта? "}
+                                        <Link
+                                            to={`/auth/register${authQuery}`}
+                                            className={
+                                                referenceAuth
+                                                    ? "button button-secondary full"
+                                                    : undefined
+                                            }
+                                        >
+                                            {referenceAuth ? (
+                                                <>
+                                                    <UserRoundPlus size={21} />
+                                                    Создать аккаунт
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Присоединиться{" "}
+                                                    <ArrowUpRight size={13} />
+                                                </>
+                                            )}
                                         </Link>
                                     </p>
                                     <Link
@@ -682,12 +756,13 @@ export function AuthPage({ kind }: { kind: AuthKind }) {
                             )}
                         </>
                     )}
+                    {referenceAuth && <AuthSecurity />}
                 </div>
                 <span className="auth-footer">
                     {brand.name} · {brand.tagline}
                 </span>
             </section>
-        </main>
+        </AuthFrame>
     );
 }
 
