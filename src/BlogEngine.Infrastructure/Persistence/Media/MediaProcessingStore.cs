@@ -56,6 +56,7 @@ public sealed class MediaProcessingStore(BlogDbContext db, DatabaseClock clock, 
 
     public async Task<IReadOnlyList<Guid>> DueAsync(CancellationToken ct)
     {
+        if (options.Value.MaintenanceMode) { return []; }
         var now = await clock.ReadAsync(db, ct);
         return await db.MediaUploads.AsNoTracking().Where(u => u.State == MediaUploadState.Processing &&
                 u.NextAttemptAt <= now && (u.LeaseUntil == null || u.LeaseUntil <= now))
@@ -64,11 +65,13 @@ public sealed class MediaProcessingStore(BlogDbContext db, DatabaseClock clock, 
 
     public async Task<MediaProcessingClaim?> ClaimAsync(Guid uploadId, CancellationToken ct)
     {
+        if (options.Value.MaintenanceMode) { return null; }
         var known = await db.MediaUploads.AsNoTracking().SingleOrDefaultAsync(u => u.Id == uploadId, ct);
         if (known is null || known.State != MediaUploadState.Processing) { return null; }
         return await writes.ExecuteAsync<MediaProcessingClaim?>(new(known.OwnerId, RoleActorId: known.Purpose == MediaPurpose.Avatar ? null : known.OwnerId,
             Avatar: known.Purpose == MediaPurpose.Avatar, FileIds: [known.FileId], DemandRole: false), async (session, token) =>
         {
+            if (options.Value.MaintenanceMode) { return null; }
             var upload = await session.LockUploadAsync(uploadId, token);
             if (upload is null || upload.State != MediaUploadState.Processing || upload.LeaseUntil > session.UtcNow || upload.NextAttemptAt > session.UtcNow) { return null; }
             if (await CheckTransitionAsync(session, upload, token) is not null) { return null; }
@@ -113,7 +116,10 @@ public sealed class MediaProcessingStore(BlogDbContext db, DatabaseClock clock, 
             if (upload.ExpiresAt <= session.UtcNow)
             { await MediaUploadTransitions.TerminateAsync(db, session, upload, MediaUploadState.Expired, "upload_expired", token); }
             else if (upload.LeaseUntil > session.UtcNow)
-            { upload.Retry(claim.Generation, session.UtcNow, TimeSpan.FromSeconds(Math.Min(900, 5 * Math.Pow(2, Math.Min(upload.Attempts, 8))))); }
+            {
+                upload.Retry(claim.Generation, session.UtcNow, TimeSpan.FromSeconds(Math.Min(900, 5 * Math.Pow(2, Math.Min(upload.Attempts, 8)))));
+                MediaTelemetry.Retries.Add(1, new KeyValuePair<string, object?>("operation", "processing"));
+            }
             return 0;
         }, ct);
 

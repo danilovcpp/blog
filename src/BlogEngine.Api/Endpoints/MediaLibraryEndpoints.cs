@@ -11,15 +11,16 @@ public static class MediaLibraryEndpoints
 {
     public static void MapMediaLibraryEndpoints(this WebApplication app)
     {
+        app.MapGet("/api/v1/media/allowance", async (HttpRequest request, CurrentActorAccessor actors, MediaAllowanceQuery query, CancellationToken ct) =>
+        {
+            var actor = await actors.GetRequiredAsync(ct);
+            return AllowanceDto.From(await query.ReadAsync(actor.Id, OwnerId(request), ct));
+        }).WithName("getMediaAllowance");
+
         app.MapGet("/api/v1/media/files", async (HttpRequest request, CurrentActorAccessor actors, MediaLibrary service, CancellationToken ct) =>
         {
             var actor = await actors.GetRequiredAsync(ct);
-            Guid? ownerId = null;
-            if (request.Query.TryGetValue("ownerId", out var owners))
-            {
-                if (owners.Count != 1 || !Guid.TryParseExact(owners[0], "D", out var parsed)) { throw DomainError.Validation("ownerId"); }
-                ownerId = parsed;
-            }
+            var ownerId = OwnerId(request);
             return FilePageDto.From(await service.ListAsync(actor, ownerId, PageValue(request, "page", 1), PageValue(request, "pageSize", 20), ct));
         }).WithName("listMediaFiles");
 
@@ -44,6 +45,13 @@ public static class MediaLibraryEndpoints
                 return content is null ? null : new MediaDownloadAccess(content.Bucket, content.Key, content.Length, content.Sha256, display ? "image/png" : "application/octet-stream", display ? null : content.Name);
             });
         }).WithMetadata(new BinaryEndpoint("application/octet-stream", AlternateContentType: "image/png")).WithName("downloadPrivateMediaFile");
+    }
+
+    private static Guid? OwnerId(HttpRequest request)
+    {
+        if (!request.Query.TryGetValue("ownerId", out var owners)) { return null; }
+        if (owners.Count != 1 || !Guid.TryParseExact(owners[0], "D", out var parsed)) { throw DomainError.Validation("ownerId"); }
+        return parsed;
     }
 
     private static int PageValue(HttpRequest request, string name, int fallback)

@@ -55,4 +55,22 @@ public sealed class MediaObject
         if (State is MediaObjectState.Retired or MediaObjectState.Deleted) { return; }
         State = MediaObjectState.Retired; RetiredAt = now; NextReconcileAt = now;
     }
+
+    public long ClaimCleanup(DateTimeOffset now, TimeSpan duration)
+    {
+        MediaRules.Utc(now);
+        if (State is not (MediaObjectState.Retired or MediaObjectState.Deleted) || LeaseUntil > now || duration <= TimeSpan.Zero)
+        { throw new DomainError("concurrency_conflict"); }
+        Generation = checked(Generation + 1); LeaseUntil = now + duration; return Generation;
+    }
+
+    public bool OwnsCleanup(long generation, DateTimeOffset now) => Generation == generation && LeaseUntil > now &&
+        State is MediaObjectState.Retired or MediaObjectState.Deleted;
+
+    public void FinishCleanup(long generation, DateTimeOffset now, DateTimeOffset next, bool deleted)
+    {
+        if (!OwnsCleanup(generation, now)) { throw new DomainError("concurrency_conflict"); }
+        if (deleted) { State = MediaObjectState.Deleted; LastReconciledAt = now; }
+        LeaseUntil = null; NextReconcileAt = next;
+    }
 }

@@ -74,7 +74,8 @@ internal static class MediaUploadTransitions
 
     public static async Task TerminateAsync(BlogDbContext db, IMediaWriteSession session, MediaUpload upload, MediaUploadState state, string code, CancellationToken ct)
     {
-        var notBefore = upload.LeaseUntil > session.UtcNow ? upload.LeaseUntil.Value : session.UtcNow;
+        var retiredAt = state == MediaUploadState.Expired ? upload.ExpiresAt : session.UtcNow;
+        var notBefore = upload.LeaseUntil > retiredAt ? upload.LeaseUntil.Value : retiredAt;
         upload.Terminate(state, code, session.UtcNow);
         var file = await db.MediaFiles.SingleAsync(f => f.Id == upload.FileId, ct);
         await db.Entry(file).ReloadAsync(ct);
@@ -83,6 +84,6 @@ internal static class MediaUploadTransitions
         // There is no live source reference on a Pending/Deleted file. The upload retains its historical source FK.
         var ids = await db.MediaObjects.Where(o => o.UploadId == upload.Id && (o.State == MediaObjectState.Planned || o.State == MediaObjectState.Present))
             .Select(o => o.Id).ToArrayAsync(ct);
-        foreach (var id in ids) { await session.RetireAsync(id, notBefore, ct); }
+        foreach (var id in ids) { await session.RetireAsync(id, notBefore, ct, retiredAt); }
     }
 }

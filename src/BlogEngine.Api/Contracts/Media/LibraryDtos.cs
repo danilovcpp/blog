@@ -15,3 +15,8 @@ public sealed record FilePageDto(int Page, int PageSize, IReadOnlyList<FileMetad
 {
     public static FilePageDto From(LibraryPage page) => new(page.Page, page.PageSize, page.Items.Select(FileMetadataDto.From).ToArray(), page.HasNextPage);
 }
+
+public sealed record AllowanceDto(long Limit, long Used, long Reserved, long Available)
+{
+    public static AllowanceDto From(MediaQuota quota) => new(quota.Limit, quota.Used, quota.Reserved, quota.Available);
+}

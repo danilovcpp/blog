@@ -53,7 +53,14 @@ public static class MediaRegistration
         services.AddScoped<UploadContentService>();
         services.AddScoped<UploadCompletion>();
         services.AddScoped<MediaLibrary>();
+        services.AddScoped<MediaAllowanceQuery>();
+        services.AddScoped<MediaReadiness>();
+        services.AddScoped<MediaTelemetry>();
+        services.AddScoped<MediaExpiryStore>();
+        services.AddScoped<MediaCleanupStore>();
+        services.AddSingleton<MediaCleanupCycle>();
         services.AddHostedService<MediaProcessingWorker>();
+        services.AddHostedService<MediaCleanupWorker>();
     }
 
     private sealed class MediaSpoolLifetime(MediaSpool spool, IWebHostEnvironment environment, IOptions<MediaOptions> options) : IHostedService

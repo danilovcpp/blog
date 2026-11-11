@@ -13,6 +13,7 @@ public sealed class SkiaImageCodec(IMediaSpool spool, IOptions<MediaOptions> opt
     public async Task<NormalizedMediaImage> NormalizeAsync(IMediaSpoolFile source, string declaredContentType, CancellationToken ct)
     {
         await decoders.WaitAsync(ct);
+        MediaTelemetry.ActiveDecodes.Add(1);
         try
         {
             await using var input = source.OpenRead();
@@ -33,6 +34,8 @@ public sealed class SkiaImageCodec(IMediaSpool spool, IOptions<MediaOptions> opt
             using var decoded = new SKBitmap(new SKImageInfo(info.Width, info.Height, SKColorType.Rgba8888, SKAlphaType.Premul));
             if (codec.GetPixels(decoded.Info, decoded.GetPixels()) != SKCodecResult.Success) { throw DomainError.Validation("content"); }
             ct.ThrowIfCancellationRequested();
+            if (codec.EncodedOrigin == SKEncodedOrigin.TopLeft) { return await EncodeAsync(decoded, ct); }
+
             var swap = codec.EncodedOrigin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
             var width = swap ? info.Height : info.Width; var height = swap ? info.Width : info.Height;
             using var oriented = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
@@ -42,18 +45,23 @@ public sealed class SkiaImageCodec(IMediaSpool spool, IOptions<MediaOptions> opt
                 canvas.SetMatrix(Orientation(codec.EncodedOrigin, info.Width, info.Height));
                 canvas.DrawBitmap(decoded, 0, 0, new SKSamplingOptions(SKFilterMode.Nearest));
             }
-            var png = await spool.CreateAsync(checked((long)width * height * 5 + 65536), (target, token) =>
-            {
-                token.ThrowIfCancellationRequested();
-                using var stream = new SKManagedWStream(target);
-                using var pixels = oriented.PeekPixels();
-                if (!pixels.Encode(stream, new SKPngEncoderOptions())) { throw DomainError.Validation("content"); }
-                token.ThrowIfCancellationRequested();
-                return Task.CompletedTask;
-            }, ct);
-            return new(png, width, height);
+            return await EncodeAsync(oriented, ct);
         }
-        finally { decoders.Release(); }
+        finally { MediaTelemetry.ActiveDecodes.Add(-1); decoders.Release(); }
+    }
+
+    private async Task<NormalizedMediaImage> EncodeAsync(SKBitmap bitmap, CancellationToken ct)
+    {
+        var png = await spool.CreateAsync(checked((long)bitmap.Width * bitmap.Height * 5 + 65536), (target, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            using var stream = new SKManagedWStream(target);
+            using var pixels = bitmap.PeekPixels();
+            if (!pixels.Encode(stream, new SKPngEncoderOptions())) { throw DomainError.Validation("content"); }
+            token.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }, ct);
+        return new(png, bitmap.Width, bitmap.Height);
     }
 
     private static SKMatrix Orientation(SKEncodedOrigin origin, int w, int h) => origin switch

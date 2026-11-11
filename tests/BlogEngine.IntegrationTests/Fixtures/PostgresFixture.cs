@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using DotNet.Testcontainers.Configurations;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -26,7 +28,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     public async Task<PostgresDatabase> CreateDatabaseAsync<TContext>(
-        Func<string, TContext> createContext, CancellationToken cancellationToken, bool benchmark = false) where TContext : DbContext
+        Func<string, TContext> createContext, CancellationToken cancellationToken, bool benchmark = false, string? targetMigration = null) where TContext : DbContext
     {
         ArgumentNullException.ThrowIfNull(createContext);
         var databaseName = (benchmark ? "sc005_disposable_" : "test_") + Guid.NewGuid().ToString("N");
@@ -53,7 +55,7 @@ public sealed class PostgresFixture : IAsyncLifetime
                 throw new InvalidOperationException("The fixture requires EF migrations; EnsureCreated is not supported.");
             }
 
-            await context.Database.MigrateAsync(cancellationToken);
+            await context.GetService<IMigrator>().MigrateAsync(targetMigration, cancellationToken);
             return database;
         }
         catch
@@ -64,6 +66,24 @@ public sealed class PostgresFixture : IAsyncLifetime
     }
 
     public ValueTask DisposeAsync() => container.DisposeAsync();
+
+    internal async Task<byte[]> DumpAsync(PostgresDatabase database, CancellationToken ct)
+    {
+        var path = "/tmp/" + Guid.NewGuid().ToString("N") + ".dump";
+        var result = await container.ExecAsync(["pg_dump", "--username", "fixture_admin", "--format=custom", "--file", path,
+            new NpgsqlConnectionStringBuilder(database.ConnectionString).Database!], ct);
+        Assert.Equal(0, result.ExitCode);
+        return await container.ReadFileAsync(path, ct);
+    }
+
+    internal async Task RestoreAsync(PostgresDatabase target, byte[] dump, CancellationToken ct)
+    {
+        var path = "/tmp/" + Guid.NewGuid().ToString("N") + ".dump";
+        await container.CopyAsync(dump, path, ct: ct);
+        var result = await container.ExecAsync(["pg_restore", "--username", "fixture_admin", "--dbname",
+            new NpgsqlConnectionStringBuilder(target.ConnectionString).Database!, "--clean", "--if-exists", "--exit-on-error", path], ct);
+        Assert.True(result.ExitCode == 0, "Restore failed; fixture stderr is withheld because it can contain data.");
+    }
 
     public async Task<PostgresDatabase> CloneDatabaseAsync(PostgresDatabase source, CancellationToken ct)
     {

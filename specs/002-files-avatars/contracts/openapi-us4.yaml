@@ -1,11 +1,52 @@
 openapi: 3.1.0
 info:
-  title: Blog Engine Media US1, US2 and US3
+  title: Blog Engine Media US1, US2, US3 and US4
   version: 1.0.0
-  description: Implemented Phase 5 slice. Allowance and final feature aggregation belong to later phases.
+  description: Implemented Phase 6 slice. Final aggregation and consumer activation remain Phase 7.
 security:
 - Bearer: []
 paths:
+  /api/v1/media/allowance:
+    get:
+      operationId: getMediaAllowance
+      summary: Read logical quota usage
+      description: Read logical quota usage
+      responses:
+        '200':
+          description: Used and non-expired reserved bytes.
+          headers:
+            Cache-Control:
+              description: Always no-store.
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Allowance'
+        default:
+          $ref: '#/components/responses/MediaErrorDefault'
+        '400':
+          $ref: '#/components/responses/MediaError400'
+        '401':
+          $ref: '#/components/responses/MediaError401'
+        '403':
+          $ref: '#/components/responses/MediaError403'
+        '404':
+          $ref: '#/components/responses/MediaError404'
+        '406':
+          $ref: '#/components/responses/MediaError406'
+        '503':
+          $ref: '#/components/responses/MediaError503'
+      parameters:
+      - name: ownerId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+        description: Only Admin may select another owner; otherwise current owner.
+      x-request-body: must be absent
   /api/v1/media/uploads:
     post:
       operationId: createMediaUpload
@@ -1592,6 +1633,33 @@ components:
       - name
       - size
       - url
+    Allowance:
+      type: object
+      additionalProperties: false
+      properties:
+        limit:
+          type: integer
+          format: int64
+          const: 1073741824
+        used:
+          type: integer
+          format: int64
+          minimum: 0
+        reserved:
+          type: integer
+          format: int64
+          minimum: 0
+        available:
+          type: integer
+          format: int64
+          minimum: 0
+      required:
+      - limit
+      - used
+      - reserved
+      - available
+      description: Bytes. Reservations with expiresAt<=database now excluded immediately, regardless of cleanup
+        lag; derivatives not charged.
     AuthorRef:
       type: object
       additionalProperties: false

@@ -90,14 +90,14 @@ public sealed class MediaWriteStore(BlogDbContext db, DatabaseClock clock, IAcco
             { throw new DomainError("concurrency_conflict"); }
             db.MediaObjects.Add(plan); await db.SaveChangesAsync(ct);
         }
-        public async Task RetireAsync(Guid objectId, DateTimeOffset notBefore, CancellationToken ct)
+        public async Task RetireAsync(Guid objectId, DateTimeOffset notBefore, CancellationToken ct, DateTimeOffset? retiredAt = null)
         {
             var obj = await db.MediaObjects.FromSqlInterpolated($"SELECT o.* FROM media.objects o JOIN media.files f ON f.id=o.file_id WHERE o.id={objectId} AND f.owner_id={ownerId} FOR UPDATE OF o").SingleOrDefaultAsync(ct)
                 ?? throw new DomainError("resource_not_found");
             await db.Entry(obj).ReloadAsync(ct);
-            obj.Retire(UtcNow);
+            obj.Retire(retiredAt ?? UtcNow);
             if (!await db.MediaCleanupJobs.AnyAsync(j => j.ObjectId == obj.Id, ct))
-            { db.MediaCleanupJobs.Add(MediaCleanupJob.Create(obj.Id, notBefore > UtcNow ? notBefore : UtcNow)); }
+            { db.MediaCleanupJobs.Add(MediaCleanupJob.Create(obj.Id, notBefore)); }
             await db.SaveChangesAsync(ct);
         }
     }

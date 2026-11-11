@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlogEngine.Core.Media.Application;
 using BlogEngine.Core.Media.Contracts;
 using BlogEngine.Infrastructure.Media;
@@ -27,7 +28,10 @@ public sealed class MediaProcessingWorker(IServiceScopeFactory scopes, IOptions<
                         async (id, token) =>
                         {
                             await using var scope = scopes.CreateAsyncScope();
-                            await scope.ServiceProvider.GetRequiredService<UploadCompletion>().ProcessAsync(id, token);
+                            using var activity = new Activity("media.processing").Start();
+                            var started = Stopwatch.GetTimestamp();
+                            try { await scope.ServiceProvider.GetRequiredService<UploadCompletion>().ProcessAsync(id, token); }
+                            finally { MediaTelemetry.ProcessingDuration.Record(Stopwatch.GetElapsedTime(started).TotalMilliseconds); }
                         });
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }

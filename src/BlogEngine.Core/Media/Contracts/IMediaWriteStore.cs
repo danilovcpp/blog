@@ -27,5 +27,5 @@ public interface IMediaWriteSession
     Task<long> ClaimUploadAsync(Guid uploadId, TimeSpan duration, CancellationToken ct);
     Task<MediaUpload> RequireFenceAsync(Guid uploadId, long generation, CancellationToken ct);
     Task SaveObjectPlanAsync(MediaObject plan, CancellationToken ct);
-    Task RetireAsync(Guid objectId, DateTimeOffset notBefore, CancellationToken ct);
+    Task RetireAsync(Guid objectId, DateTimeOffset notBefore, CancellationToken ct, DateTimeOffset? retiredAt = null);
 }

@@ -18,6 +18,11 @@ FROM runtime AS media-codec-validation
 COPY --from=codec-test-build /source/tests/BlogEngine.IntegrationTests/bin/Release/net10.0 .
 ENTRYPOINT ["dotnet", "BlogEngine.IntegrationTests.dll", "-class", "BlogEngine.IntegrationTests.Media.ImageCodecTests"]
 
+FROM runtime AS media-resource-validation
+COPY --from=codec-test-build /source/tests/BlogEngine.IntegrationTests/bin/Release/net10.0 .
+ENV ASPNETCORE_TEST_CONTENTROOT_BLOGENGINE_API=/app
+ENTRYPOINT ["dotnet", "BlogEngine.IntegrationTests.dll", "-class", "BlogEngine.IntegrationTests.Media.MediaResourceContainerTests"]
+
 FROM runtime AS final
 WORKDIR /app
 COPY --from=build /app .

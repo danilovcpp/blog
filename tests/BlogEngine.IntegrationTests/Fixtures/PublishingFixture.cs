@@ -5,6 +5,7 @@ using System.Text.Json;
 using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Accounts.Domain;
 using BlogEngine.IntegrationTests.Accounts;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 
@@ -14,6 +15,12 @@ internal sealed class PublishingFixture : IAsyncDisposable
 {
     public static string ArtifactPath(string name)
     {
+        const string mediaPrefix = "media/phase6/";
+        if (name.StartsWith(mediaPrefix, StringComparison.Ordinal) && Environment.GetEnvironmentVariable("BLOG_MEDIA_VALIDATION_DIRECTORY") is { Length: > 0 } destination)
+        {
+            Directory.CreateDirectory(destination);
+            return Path.Combine(destination, name[mediaPrefix.Length..]);
+        }
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(directory.FullName, "BlogEngine.slnx")))
         { directory = directory.Parent ?? throw new InvalidOperationException("Repository root was not found."); }
@@ -31,9 +38,16 @@ internal sealed class PublishingFixture : IAsyncDisposable
     public HttpClient Anonymous { get; }
 
     public static async Task<PublishingFixture> StartAsync(PostgresFixture postgres, CancellationToken ct, DbCommandInterceptor? commandInterceptor = null,
-        BlogEngine.Infrastructure.Persistence.DatabaseClock? viewClock = null, bool benchmark = false, GarageFixture? mediaStorage = null)
+        BlogEngine.Infrastructure.Persistence.DatabaseClock? viewClock = null, bool benchmark = false, GarageFixture? mediaStorage = null,
+        string? upgradeFrom = null, Func<PostgresDatabase, CancellationToken, Task>? seedBeforeUpgrade = null)
     {
-        var database = await postgres.CreateDatabaseAsync(BootstrapTests.Context, ct, benchmark);
+        var database = await postgres.CreateDatabaseAsync(BootstrapTests.Context, ct, benchmark, upgradeFrom);
+        if (upgradeFrom is not null)
+        {
+            if (seedBeforeUpgrade is not null) { await seedBeforeUpgrade(database, ct); }
+            await using var context = BootstrapTests.Context(database.ConnectionString);
+            await context.Database.MigrateAsync(ct);
+        }
         var roles = new[] { "owner_role", "migration_role", "runtime_role", "operator_role" }.ToDictionary(x => x, _ => "pub_" + Guid.NewGuid().ToString("N"));
         var password = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         await using var connection = new NpgsqlConnection(database.ConnectionString);

@@ -15,13 +15,13 @@ namespace BlogEngine.IntegrationTests.Reading;
 
 [Trait("Category", "Reading")]
 [Trait("Category", "BenchmarkDataset")]
-public sealed class FullDatasetQueryTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>
+public sealed class FullDatasetQueryTests(PostgresFixture postgres, GarageFixture garage) : IClassFixture<PostgresFixture>, IClassFixture<GarageFixture>
 {
     [Fact(Timeout = 1_200_000)]
     public async Task FullSeedReproducesCanonicalChecksumsAndActualSqlHasBoundedPlansIncludingTaxonomyClone()
     {
         var ct = TestContext.Current.CancellationToken; var capture = new ReadingSqlCapture();
-        await using var f = await StartAsync(postgres, ct, capture, benchmark: true);
+        await using var f = await StartAsync(postgres, ct, capture, benchmark: true, mediaStorage: garage);
         var seed = new SeedDataset(f.Identity.Issuer); var output = ArtifactPath("../../artifacts/performance/sc-005/preparation");
         var databaseName = new NpgsqlConnectionStringBuilder(f.Database.ConnectionString).Database!;
         var manifest = await seed.SeedAsync(f.Database.ConnectionString, databaseName, output, ct, PostgresImage.Reference);

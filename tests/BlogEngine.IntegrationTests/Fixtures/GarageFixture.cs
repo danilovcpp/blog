@@ -29,7 +29,9 @@ public sealed class GarageFixture : IAsyncLifetime
     public IReadOnlyList<string> Buckets => [OriginalsBucket, RenditionsBucket];
     public Uri Endpoint { get; private set; } = null!;
 
-    public async ValueTask InitializeAsync()
+    public ValueTask InitializeAsync() => InitializeAsync(null);
+
+    internal async ValueTask InitializeAsync(GarageRecoverySnapshot? snapshot)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(3));
@@ -37,6 +39,21 @@ public sealed class GarageFixture : IAsyncLifetime
         try
         {
             await metadata.CreateAsync(ct); await data.CreateAsync(ct);
+            if (snapshot is not null)
+            {
+                // Restore complete stopped volumes into new empty volumes, never merge live metadata.
+                await using var restore = new ContainerBuilder(PostgresImage.Reference)
+                    .WithEntrypoint("/bin/sh").WithCommand("-c", "sleep infinity")
+                    .WithVolumeMount(metadata, "/restore/meta").WithVolumeMount(data, "/restore/data")
+                    .WithResourceMapping(snapshot.Metadata, "/backup/meta.tar")
+                    .WithResourceMapping(snapshot.Data, "/backup/data.tar").Build();
+                await restore.StartAsync(ct);
+                foreach (var part in new[] { "meta", "data" })
+                {
+                    var extract = await restore.ExecAsync(["tar", "-xf", "/backup/" + part + ".tar", "-C", "/restore/" + part], ct);
+                    Assert.Equal(0, extract.ExitCode);
+                }
+            }
             container = new ContainerBuilder(GarageImage.Reference)
                 .WithEnvironment("GARAGE_RPC_SECRET", Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant())
                 .WithEnvironment("GARAGE_ADMIN_TOKEN", adminToken)
@@ -56,6 +73,7 @@ public sealed class GarageFixture : IAsyncLifetime
                 .Build();
             await container.StartAsync(ct);
             ConfigureEndpoints();
+            if (snapshot is not null) { accessKey = snapshot.AccessKey; secretKey = snapshot.SecretKey; return; }
             // The versioned JSON API is used instead of parsing unstable human CLI output.
             var status = await AdminAsync(HttpMethod.Get, "GetClusterStatus", null, ct);
             var node = status.GetProperty("nodes")[0].GetProperty("id").GetString()!;
@@ -186,6 +204,22 @@ public sealed class GarageFixture : IAsyncLifetime
     }
 
     public Task StopAsync(CancellationToken ct) => container!.StopAsync(ct);
+    internal async Task<GarageRecoverySnapshot> SnapshotAsync(CancellationToken ct)
+    {
+        await StopAsync(ct);
+        return new(await ArchiveAsync("/var/lib/garage/meta/.", ct), await ArchiveAsync("/var/lib/garage/data/.", ct), accessKey, secretKey);
+    }
+
+    private async Task<byte[]> ArchiveAsync(string path, CancellationToken ct)
+    {
+        var start = new ProcessStartInfo("docker") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var arg in new[] { "cp", container!.Id + ":" + path, "-" }) { start.ArgumentList.Add(arg); }
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("Snapshot helper did not start.");
+        var error = process.StandardError.ReadToEndAsync(ct);
+        using var archive = new MemoryStream(); await process.StandardOutput.BaseStream.CopyToAsync(archive, ct);
+        await process.WaitForExitAsync(ct); await error;
+        Assert.Equal(0, process.ExitCode); return archive.ToArray();
+    }
     public async Task RestartAsync(CancellationToken ct)
     {
         await container!.StartAsync(ct);
@@ -210,3 +244,5 @@ public sealed class GarageFixture : IAsyncLifetime
         finally { try { await data.DisposeAsync(); } finally { await metadata.DisposeAsync(); } }
     }
 }
+
+internal sealed record GarageRecoverySnapshot(byte[] Metadata, byte[] Data, string AccessKey, string SecretKey);

@@ -1,3 +1,5 @@
+using BlogEngine.Core.Shared;
+
 namespace BlogEngine.Core.Media.Domain;
 
 public sealed class MediaCleanupJob
@@ -17,5 +19,19 @@ public sealed class MediaCleanupJob
     {
         MediaRules.Utc(notBefore);
         return new() { Id = Guid.NewGuid(), ObjectId = objectId, NotBefore = notBefore, DueAt = notBefore, NextAttemptAt = notBefore };
+    }
+
+    public void Claim(DateTimeOffset now, TimeSpan duration)
+    {
+        MediaRules.Utc(now);
+        if (now < NotBefore || LeaseUntil > now || duration <= TimeSpan.Zero) { throw new DomainError("concurrency_conflict"); }
+        Generation = checked(Generation + 1); LeaseUntil = now + duration; Attempts = checked(Attempts + 1);
+    }
+
+    public void Finish(DateTimeOffset now, DateTimeOffset next, bool deleted)
+    {
+        LeaseUntil = null;
+        if (deleted) { CompletedAt ??= now; ErrorCode = null; }
+        else { NextAttemptAt = next > NotBefore ? next : NotBefore; ErrorCode = "media_storage_unavailable"; }
     }
 }

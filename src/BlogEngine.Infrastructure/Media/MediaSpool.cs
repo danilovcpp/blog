@@ -56,7 +56,7 @@ public sealed class MediaSpool(IOptions<MediaOptions> options, ILogger<MediaSpoo
         var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, stopping.Token);
         linked.CancelAfter(settings.Transfers.TotalTimeout);
         var acquired = false;
-        try { await transfers.WaitAsync(linked.Token); acquired = true; RequireReady(); return new Transfer(transfers, linked); }
+        try { await transfers.WaitAsync(linked.Token); acquired = true; RequireReady(); MediaTelemetry.ActiveTransfers.Add(1); return new Transfer(transfers, linked); }
         catch { if (acquired) { transfers.Release(); } linked.Dispose(); throw; }
     }
 
@@ -69,6 +69,7 @@ public sealed class MediaSpool(IOptions<MediaOptions> options, ILogger<MediaSpoo
             if (new DriveInfo(settings.Spool.Directory).AvailableFreeSpace < settings.Spool.BudgetBytes - UsedBytes) { return false; }
             await using (var file = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.Asynchronous | FileOptions.DeleteOnClose))
             { await file.WriteAsync(new byte[1], ct); await file.FlushAsync(ct); }
+            MediaTelemetry.SpoolFree.Record(settings.Spool.BudgetBytes - UsedBytes);
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return false; }
@@ -105,6 +106,7 @@ public sealed class MediaSpool(IOptions<MediaOptions> options, ILogger<MediaSpoo
             }
             finally { ArrayPool<byte>.Shared.Return(buffer); }
             linked.Token.ThrowIfCancellationRequested();
+            MediaTelemetry.TransferSize.Record(file.Length);
             return file;
         }
         catch { await file.DisposeAsync(); throw; }
@@ -127,7 +129,7 @@ public sealed class MediaSpool(IOptions<MediaOptions> options, ILogger<MediaSpoo
             RequireReady();
             if (file.Length > maximum - count) { throw new DomainError("request_too_large"); }
             if (used > settings.Spool.BudgetBytes - count) { throw new DomainError("media_capacity_unavailable"); }
-            used += count; file.AddLength(count);
+            used += count; file.AddLength(count); MediaTelemetry.SpoolBytes.Add(count);
         }
     }
 
@@ -153,7 +155,7 @@ public sealed class MediaSpool(IOptions<MediaOptions> options, ILogger<MediaSpoo
         private int disposed;
         public CancellationToken CancellationToken => source.Token;
         public ValueTask DisposeAsync()
-        { if (Interlocked.Exchange(ref disposed, 1) == 0) { slots.Release(); source.Dispose(); } return ValueTask.CompletedTask; }
+        { if (Interlocked.Exchange(ref disposed, 1) == 0) { MediaTelemetry.ActiveTransfers.Add(-1); slots.Release(); source.Dispose(); } return ValueTask.CompletedTask; }
     }
 
     private sealed class SpoolFile(MediaSpool owner, string path) : IMediaSpoolFile
@@ -177,7 +179,7 @@ public sealed class MediaSpool(IOptions<MediaOptions> options, ILogger<MediaSpoo
             if (Interlocked.Exchange(ref disposed, 1) != 0) { return ValueTask.CompletedTask; }
             lock (owner.gate)
             {
-                try { File.Delete(path); owner.used -= Length; owner.files.Remove(this); }
+                try { File.Delete(path); owner.used -= Length; MediaTelemetry.SpoolBytes.Add(-Length); owner.files.Remove(this); }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 { owner.IsReady = false; owner.log.LogError("Media spool cleanup failed: {ExceptionType}", e.GetType().Name); }
             }

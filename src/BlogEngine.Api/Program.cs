@@ -36,6 +36,7 @@ app.Use(async (context, next) =>
     await next(context);
 });
 app.UseAuthorization();
+app.UseMiddleware<MediaMaintenanceMiddleware>();
 app.UseMiddleware<RequestContractValidation>();
 app.MapHealthEndpoints();
 app.MapMeEndpoints();

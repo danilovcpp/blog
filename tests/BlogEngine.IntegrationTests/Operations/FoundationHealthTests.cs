@@ -10,7 +10,7 @@ using Npgsql;
 namespace BlogEngine.IntegrationTests.Operations;
 
 [Trait("Category", "Operations")]
-public sealed class FoundationHealthTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>
+public sealed class FoundationHealthTests(PostgresFixture postgres, GarageFixture garage) : IClassFixture<PostgresFixture>, IClassFixture<GarageFixture>
 {
     [Fact]
     public async Task ReadinessRecoversUsingTheSharedBoundedLoaderWhileLivenessIsIndependent()
@@ -20,7 +20,7 @@ public sealed class FoundationHealthTests(PostgresFixture postgres) : IClassFixt
         await using var identity = new JwksFixture();
         await identity.InitializeAsync();
         identity.SetResponse("down", HttpStatusCode.ServiceUnavailable);
-        await using var factory = new ApiFactory(database.ConnectionString, identity);
+        await using var factory = new ApiFactory(database.ConnectionString, identity) { MediaStorage = garage };
         using var client = factory.CreateClient();
         using var live = await client.GetAsync("/health/live", ct);
         Assert.Equal(HttpStatusCode.OK, live.StatusCode);

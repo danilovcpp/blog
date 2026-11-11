@@ -10,13 +10,13 @@ using static BlogEngine.IntegrationTests.Fixtures.PublishingFixture;
 namespace BlogEngine.IntegrationTests.Contracts;
 
 [Trait("Category", "ConsumerContract")]
-public sealed class ConsumerWalkthroughTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>
+public sealed class ConsumerWalkthroughTests(PostgresFixture postgres, GarageFixture garage) : IClassFixture<PostgresFixture>, IClassFixture<GarageFixture>
 {
     [Fact]
     public async Task DocumentedConsumerCompletesAllSevenStoriesAndReceivesOnlyPermittedFields()
     {
         var ct = TestContext.Current.CancellationToken; var contract = await OpenApiCompatibilityTests.ContractAsync(ct);
-        await using var f = await StartAsync(postgres, ct);
+        await using var f = await StartAsync(postgres, ct, mediaStorage: garage);
         var author = await f.ActorAsync(LocalRole.Author, ct); var reader = await f.ActorAsync(LocalRole.Reader, ct);
         var admin = await f.ActorAsync(LocalRole.Admin, ct); var moderator = await f.ActorAsync(LocalRole.Moderator, ct);
         var covered = new HashSet<string>();

@@ -140,7 +140,7 @@ public sealed class ImageCodecTests
         }
     }
 
-    private static uint Crc(ReadOnlySpan<byte> bytes)
+    internal static uint Crc(ReadOnlySpan<byte> bytes)
     {
         var crc = uint.MaxValue;
         foreach (var value in bytes) { crc ^= value; for (var bit = 0; bit < 8; bit++) { crc = (crc >> 1) ^ ((crc & 1) != 0 ? 0xedb88320u : 0u); } }

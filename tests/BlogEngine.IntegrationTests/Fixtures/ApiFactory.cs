@@ -20,6 +20,8 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
     public GarageFixture? MediaStorage { get; init; }
     public IStartupFilter? MediaProbes { get; init; }
     public bool RunMediaWorker { get; init; }
+    public bool RunMediaCleanupWorker { get; init; }
+    public string? MediaSpoolDirectory { get; init; }
     public Action<IServiceCollection>? CustomizeServices { get; init; }
     public IReadOnlyDictionary<string, string> VisitorKeys { get; init; } = new Dictionary<string, string>
     { ["fixture"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) };
@@ -42,7 +44,7 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
                 ["Media:Storage:AllowLocalHttp"] = "true",
                 ["Media:Storage:AccessKey"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
                 ["Media:Storage:SecretKey"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
-                ["Media:Spool:Directory"] = Path.Combine(Path.GetTempPath(), "blog-media-tests", Guid.NewGuid().ToString("N")),
+                ["Media:Spool:Directory"] = MediaSpoolDirectory ?? Path.Combine(Path.GetTempPath(), "blog-media-tests", Guid.NewGuid().ToString("N")),
             };
             foreach (var (id, secret) in VisitorKeys) { values["AnonymousVisitors:Keys:" + id] = secret; }
             if (MediaStorage is not null)
@@ -51,6 +53,12 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
         });
         builder.ConfigureTestServices(services =>
         {
+            if (!RunMediaCleanupWorker)
+            {
+                var cleanup = services.Single(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) &&
+                    d.ImplementationType == typeof(BlogEngine.Infrastructure.Maintenance.MediaCleanupWorker));
+                services.Remove(cleanup);
+            }
             if (!RunMediaWorker)
             {
                 var worker = services.Single(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) &&

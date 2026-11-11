@@ -35,7 +35,7 @@ public sealed class OpenApiCompatibilityTests
         var result = await OpenApiDocument.LoadAsync(path, settings, ct);
         Assert.Empty(result.Diagnostic!.Errors);
         var contract = result.Document!;
-        var mediaPath = Path.Combine(Path.GetDirectoryName(path)!, "..", "..", "002-files-avatars", "contracts", "openapi-us3.yaml");
+        var mediaPath = Path.Combine(Path.GetDirectoryName(path)!, "..", "..", "002-files-avatars", "contracts", "openapi-us4.yaml");
         var media = await OpenApiDocument.LoadAsync(mediaPath, settings, ct); Assert.Empty(media.Diagnostic!.Errors);
         foreach (var (route, item) in media.Document!.Paths) { contract.Paths.Add(route, item); }
         foreach (var (name, schema) in media.Document.Components!.Schemas!) { contract.Components!.Schemas![name] = schema; }
@@ -70,7 +70,7 @@ public sealed class OpenApiCompatibilityTests
             .SelectMany(p => p.Value!.AsObject().Where(o => o.Key is "get" or "post" or "put" or "delete")).ToArray();
         var mediaOperations = actual["paths"]!.AsObject().Where(p => p.Key.StartsWith("/api/v1/media/", StringComparison.Ordinal))
             .SelectMany(p => p.Value!.AsObject().Where(o => o.Key is "get" or "post" or "put" or "delete")).ToArray();
-        Assert.Equal(9, mediaOperations.Length);
+        Assert.Equal(10, mediaOperations.Length);
         Assert.Equal(comparisons.Count, publicOperations.Length);
         var mediaCodes = actual["components"]!["schemas"]!["MediaProblem"]!["properties"]!["code"]!["enum"]!.AsArray()
             .Select(c => c!.GetValue<string>()).ToArray();

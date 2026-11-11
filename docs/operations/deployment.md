@@ -35,7 +35,7 @@ Operator требует только Identity__Issuer и собственный 
 потом смена active key; удаление старого ключа инвалидирует старые visitor tokens.
 TLS завершается на доверенном ingress. Ограничьте прямой доступ к контейнерам,
 настройте body envelope не меньше контрактных 8 MiB с безопасным 413 на внешней
-границе. `/health/live` — process liveness, `/health/ready` — DB/JWKS readiness;
+границе. `/health/live` — process liveness, `/health/ready` — PostgreSQL/JWKS/Media readiness;
 readiness доступен внутренней сети. В Production OpenAPI/Swagger выключены.
 Документация потребителя: нормативные openapi.yaml и operations.md.
 
@@ -57,15 +57,19 @@ readiness доступен внутренней сети. В Production OpenAPI/
    migration credential. Не передавайте её API/Operator. Скрипт permissions.sql
    применяет оператор БД с проверенными именами owner/migration/runtime/operator;
    после новых таблиц повторите grants. Отдельно проверьте отказ runtime/operator DDL.
-5. Запустите новую API-реплику, дождитесь readiness, проверьте consumer walkthrough
-   на изолированной установке и затем переключите трафик. Старую версию выключайте
-   после дренирования запросов. Очистка dedup прекращается по host CancellationToken.
+5. Для Media до запуска совместимой записи закройте ingress старых writers,
+   дренируйте и остановите их, включая GET и Operator. Отзовите прежние credentials,
+   проверьте отсутствие DB sessions и отрицательным новым соединением подтвердите
+   невозможность записи. Затем запускайте совместимый API с новыми credentials
+   при закрытой внешней записи, проверьте readiness/consumer smoke и откройте её.
+   Порядок восстановления и rollback — [media-recovery.md](media-recovery.md).
 
 ## Восстановление
 
 При сбое DDL транзакция откатывается; проверьте migration history и фактическую схему.
-При сбое приложения после успешного additive migration верните прежний image,
-если его совместимость с новой схемой подтверждена. Предпочитайте исправляющую
+При сбое приложения после успешного additive migration верните совместимый image
+при закрытой записи. После managed usages старый writer возвращается только
+через согласованный recovery set по Media runbook. Предпочитайте исправляющую
 forward migration; production Down удаляет новые таблицы вместе с данными и не
 является безопасным автоматическим rollback. Для восстановления из backup
 остановите запись, восстановите в новую БД, проверьте инварианты и переключите
@@ -111,3 +115,34 @@ Blog и Identity делят network namespace для разрешённого lo
 установки; отчёт содержит только безопасные результаты и image/schema hashes.
 Сценарий удаляет свои контейнеры, сеть и временные secret-файлы.
 Результат: `artifacts/validation/live-identity/result.json`.
+
+## Media: ingress, resources и maintenance
+
+Raw PUT ограничивается API по назначению: 50/10/5 MiB. На референсном ingress
+задайте ceiling **51 MiB / 53 477 376 bytes** только для binary upload routes.
+Сохраняйте JSON limit **8 MiB**. Отказ ingress до API не меняет upload/reservation:
+клиент читает GET status и повторяет PUT или отменяет upload. Не поднимайте
+глобальный JSON limit ради файлов. Body должен передаваться потоком; upstream
+buffering и resource limits проверяются отдельно на целевом ingress.
+
+API memory budget — минимум **1 GiB**. На Linux-контейнере с cap 1 GiB проверяются
+четыре одновременных disk-spooled transfer по 50 MiB и decode 40 млн pixels.
+`scripts/validation/Invoke-MediaResourceValidation.ps1` сохраняет cgroup peak,
+OOM/restart результат и после принудительного kill повторно подключает тот же
+spool volume. Проверка использует Kestrel и production spool/codec под APP_UID.
+Тестовый маршрут передаёт тело по HTTP потоком. Storage faults проверяются
+интеграционными тестами с Garage. Spool disk budget —
+отдельный 1 GiB, четыре общих transfer slots, один decoder по умолчанию.
+
+У каждой replica свой постоянный private spool вне webroot. До transfers/readiness
+процесс захватывает эксклюзивное владение, удаляет только оставленные Media spool
+files и проверяет physical capacity. Занятый том/ошибка reclaim/исчерпание capacity
+оставляют readiness отрицательной; liveness проверяет процесс. Нельзя разделять
+один volume между одновременно работающими replica.
+
+`Media:MaintenanceMode=true` блокирует API mutations и новые processing/cleanup
+claims; in-flight операции дренируются штатно. Настройка применяется на всех hosts
+при их перезапуске через configuration provider. Для backup после drain остановите
+все hosts вместе с GET и Operator: GET с bootstrap всё ещё может писать.
+Readiness дополнительно проверяет Media marker/read grants, оба private sentinel,
+spool и native codec. Bucket/schema provisioning при probe запрещён.
