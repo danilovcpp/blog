@@ -366,6 +366,7 @@
           "BlogEngine.Core": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore": "[10.0.13, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.13, )",
+          "Microsoft.Extensions.Hosting": "[10.0.13, )",
           "Microsoft.IdentityModel.JsonWebTokens": "[8.19.2, )",
           "Npgsql": "[10.0.3, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",

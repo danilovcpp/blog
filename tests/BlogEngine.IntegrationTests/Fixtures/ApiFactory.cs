@@ -19,6 +19,8 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
     public DatabaseClock? ViewClock { get; init; }
     public GarageFixture? MediaStorage { get; init; }
     public IStartupFilter? MediaProbes { get; init; }
+    public bool RunMediaWorker { get; init; }
+    public Action<IServiceCollection>? CustomizeServices { get; init; }
     public IReadOnlyDictionary<string, string> VisitorKeys { get; init; } = new Dictionary<string, string>
     { ["fixture"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) };
 
@@ -49,11 +51,18 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
         });
         builder.ConfigureTestServices(services =>
         {
+            if (!RunMediaWorker)
+            {
+                var worker = services.Single(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService) &&
+                    d.ImplementationType == typeof(BlogEngine.Infrastructure.Maintenance.MediaProcessingWorker));
+                services.Remove(worker);
+            }
             if (commandInterceptor is not null) { services.AddDbContext<BlogDbContext>(options => options.AddInterceptors(commandInterceptor)); }
             services.AddSingleton<TimeProvider>(Time);
             if (ViewClock is not null) { services.AddSingleton(ViewClock); }
             services.AddSingleton<IStartupFilter, FoundationProbes>();
             if (MediaProbes is not null) { services.AddSingleton(MediaProbes); }
+            CustomizeServices?.Invoke(services);
         });
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
     }

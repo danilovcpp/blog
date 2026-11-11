@@ -75,6 +75,7 @@ public sealed class MediaUpload
     {
         RequireActive(now);
         if (State != MediaUploadState.ContentReceived) { throw new DomainError("invalid_state"); }
+        if (LeaseUntil > now) { throw new DomainError("upload_in_progress"); }
         State = MediaUploadState.Processing; NextAttemptAt = now;
     }
 
@@ -98,6 +99,19 @@ public sealed class MediaUpload
         RequireLease(generation, now);
         if (delay <= TimeSpan.Zero || delay > TimeSpan.FromMinutes(15)) { throw new ArgumentOutOfRangeException(nameof(delay)); }
         LeaseUntil = null; NextAttemptAt = now + delay;
+    }
+
+    public void ReleaseTransfer(long generation)
+    {
+        if (generation == LeaseGeneration && State is MediaUploadState.AwaitingContent or MediaUploadState.ContentReceived)
+        { LeaseUntil = null; }
+    }
+
+    public void RenewLease(long generation, DateTimeOffset now, TimeSpan duration)
+    {
+        RequireLease(generation, now);
+        if (duration <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(duration)); }
+        LeaseUntil = now + duration;
     }
 
     private void RequireActive(DateTimeOffset now)

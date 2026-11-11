@@ -62,7 +62,13 @@ public sealed class OpenApiCompatibilityTests
         { Assert.True(JsonNode.DeepEquals(schema, actual["components"]!["schemas"]![name]), "Schema " + name); }
         var publicOperations = actual["paths"]!.AsObject().Where(p => p.Key.StartsWith("/api/", StringComparison.Ordinal) || p.Key.StartsWith("/health/", StringComparison.Ordinal))
             .SelectMany(p => p.Value!.AsObject().Where(o => o.Key is "get" or "post" or "put" or "delete")).ToArray();
-        Assert.Equal(comparisons.Count, publicOperations.Length);
+        var mediaOperations = actual["paths"]!.AsObject().Where(p => p.Key.StartsWith("/api/v1/media/", StringComparison.Ordinal))
+            .SelectMany(p => p.Value!.AsObject().Where(o => o.Key is "get" or "post" or "put" or "delete")).ToArray();
+        Assert.Equal(8, mediaOperations.Length);
+        Assert.Equal(comparisons.Count + mediaOperations.Length, publicOperations.Length);
+        var mediaCodes = actual["components"]!["schemas"]!["MediaProblem"]!["properties"]!["code"]!["enum"]!.AsArray()
+            .Select(c => c!.GetValue<string>()).ToArray();
+        Assert.Contains("idempotency_conflict", mediaCodes); Assert.Contains("content_conflict", mediaCodes); Assert.Contains("quota_exceeded", mediaCodes);
         await File.WriteAllTextAsync(ArtifactPath("contracts.json"), new JsonObject
         {
             ["status"] = "passed",

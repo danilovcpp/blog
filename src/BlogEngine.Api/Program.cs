@@ -7,6 +7,12 @@ builder.AddBlogEngine();
 var app = builder.Build();
 
 app.UseMiddleware<RequestLogging>();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api/v1/media"))
+    { context.Response.OnStarting(() => { context.Response.Headers.CacheControl = "no-store"; return Task.CompletedTask; }); }
+    await next(context);
+});
 app.UseMiddleware<ProblemDetailsHandler>();
 if (app.Environment.IsDevelopment())
 {
@@ -41,6 +47,8 @@ app.MapCommentEndpoints();
 app.MapModerationEndpoints();
 app.MapLikeEndpoints();
 app.MapViewEndpoints();
+app.MapMediaUploadEndpoints();
+app.MapMediaLibraryEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();

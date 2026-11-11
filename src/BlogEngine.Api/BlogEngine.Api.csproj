@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="../../specs/001-blog-engine-mvp/contracts/openapi.yaml" LogicalName="BlogEngine.Api.openapi.yaml" />
+    <EmbeddedResource Include="../../specs/002-files-avatars/contracts/openapi-us1.yaml" LogicalName="BlogEngine.Api.media-us1.yaml" />
     <Folder Include="Endpoints/" />
     <Folder Include="Contracts/" />
     <Folder Include="Configuration/" />

@@ -12,7 +12,8 @@ public sealed class MediaWriteStore(BlogDbContext db, DatabaseClock clock, IAcco
     public async Task<T> ExecuteAsync<T>(MediaWriteLocks locks, Func<IMediaWriteSession, CancellationToken, Task<T>> operation, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
-        if (locks.RoleActorId is { } actor) { AccessPolicy.Demand(await roles.LockAndReadAsync(actor, ct), ActorAction.CreatePublication); }
+        var roleActor = locks.RoleActorId is { } actor ? await roles.LockAndReadAsync(actor, ct) : null;
+        if (locks.DemandRole && roleActor is not null) { AccessPolicy.Demand(roleActor, ActorAction.CreatePublication); }
         if (locks.PublicationId is { } publication)
         {
             var owner = await db.Database.SqlQuery<Guid>($"SELECT author_id AS \"Value\" FROM publishing.publications WHERE id={publication} FOR UPDATE").SingleOrDefaultAsync(ct);
@@ -29,15 +30,16 @@ public sealed class MediaWriteStore(BlogDbContext db, DatabaseClock clock, IAcco
         foreach (var id in (locks.FileIds ?? []).Distinct().Order())
         { await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM media.files WHERE id={id} AND owner_id={locks.OwnerId} FOR UPDATE", ct); }
         var now = await clock.ReadAsync(db, ct);
-        var result = await operation(new Session(db, clock, locks.OwnerId, allowance, now), ct);
+        var result = await operation(new Session(db, clock, locks.OwnerId, allowance, now, roleActor), ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return result;
     }
 
-    private sealed class Session(BlogDbContext db, DatabaseClock clock, Guid ownerId, StorageAllowance allowance, DateTimeOffset now) : IMediaWriteSession
+    private sealed class Session(BlogDbContext db, DatabaseClock clock, Guid ownerId, StorageAllowance allowance, DateTimeOffset now, CurrentActor? actor) : IMediaWriteSession
     {
         public DateTimeOffset UtcNow { get; private set; } = now;
+        public CurrentActor? RoleActor => actor;
         public async Task<MediaQuota> QuotaAsync(CancellationToken ct)
         {
             var reserved = await db.MediaUploads.Where(u => u.OwnerId == ownerId &&

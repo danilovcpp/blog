@@ -1,8 +1,11 @@
 using BlogEngine.Core.Accounts.Contracts;
+using BlogEngine.Core.Media.Application;
 using BlogEngine.Core.Media.Contracts;
+using BlogEngine.Infrastructure.Maintenance;
 using BlogEngine.Infrastructure.Media;
 using BlogEngine.Infrastructure.Persistence.Accounts;
 using BlogEngine.Infrastructure.Persistence.Media;
+using BlogEngine.Infrastructure.ReadModels;
 using Microsoft.Extensions.Options;
 using SkiaSharp;
 
@@ -25,6 +28,17 @@ public static class MediaRegistration
         services.AddScoped<IAccountRoleWriteGuard, AccountRoleWriteGuard>();
         services.AddScoped<IMediaWriteStore, MediaWriteStore>();
         services.AddScoped<MediaBinaryTransport>();
+        services.AddScoped<IUploadLifecycleStore, UploadLifecycleStore>();
+        services.AddScoped<IUploadTransferStore, UploadTransferStore>();
+        services.AddScoped<IMediaProcessingStore, MediaProcessingStore>();
+        services.AddSingleton<IMediaProcessingLease, MediaProcessingLease>();
+        services.AddScoped<IMediaUploadProcessor, AttachmentProcessing>();
+        services.AddScoped<IMediaLibraryQuery, MediaLibraryQuery>();
+        services.AddScoped<UploadLifecycle>();
+        services.AddScoped<UploadContentService>();
+        services.AddScoped<UploadCompletion>();
+        services.AddScoped<MediaLibrary>();
+        services.AddHostedService<MediaProcessingWorker>();
     }
 
     private sealed class MediaSpoolLifetime(MediaSpool spool, IWebHostEnvironment environment, IOptions<MediaOptions> options) : IHostedService

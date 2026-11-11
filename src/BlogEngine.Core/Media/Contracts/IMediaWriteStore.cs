@@ -1,9 +1,10 @@
+using BlogEngine.Core.Accounts.Contracts;
 using BlogEngine.Core.Media.Domain;
 
 namespace BlogEngine.Core.Media.Contracts;
 
 public sealed record MediaWriteLocks(Guid OwnerId, Guid? RoleActorId = null, Guid? PublicationId = null,
-    bool Avatar = false, IReadOnlyList<Guid>? FileIds = null);
+    bool Avatar = false, IReadOnlyList<Guid>? FileIds = null, bool DemandRole = true);
 public sealed record MediaQuota(long Limit, long Used, long Reserved)
 {
     public long Available => checked(Limit - Used - Reserved);
@@ -18,6 +19,7 @@ public interface IMediaWriteStore
 public interface IMediaWriteSession
 {
     DateTimeOffset UtcNow { get; }
+    CurrentActor? RoleActor { get; }
     Task<MediaQuota> QuotaAsync(CancellationToken ct);
     Task ReserveAsync(MediaFile file, MediaUpload upload, CancellationToken ct);
     Task ApplyUsageAsync(long delta, CancellationToken ct);
