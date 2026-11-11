@@ -22,12 +22,15 @@ public sealed class MediaWriteStore(BlogDbContext db, DatabaseClock clock, IAcco
         await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO media.allowances(owner_id,limit_bytes,used_bytes) VALUES ({locks.OwnerId},{MediaRules.DefaultAllowance},0) ON CONFLICT DO NOTHING", ct);
         var allowance = await db.StorageAllowances.FromSqlInterpolated($"SELECT * FROM media.allowances WHERE owner_id={locks.OwnerId} FOR UPDATE").SingleAsync(ct);
         await db.Entry(allowance).ReloadAsync(ct);
+        Guid? avatarFile = null;
         if (locks.Avatar)
         {
             await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO media.avatar_states(user_id,version,updated_at) VALUES ({locks.OwnerId},{Guid.NewGuid()},clock_timestamp()) ON CONFLICT DO NOTHING", ct);
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM media.avatar_states WHERE user_id={locks.OwnerId} FOR UPDATE", ct);
+            avatarFile = await db.AvatarStates.AsNoTracking().Where(a => a.UserId == locks.OwnerId).Select(a => a.CurrentFileId).SingleAsync(ct);
         }
-        foreach (var id in (locks.FileIds ?? []).Distinct().Order())
+        // The state lock fixes the previous avatar; lock it and the candidate in the same UUID order.
+        foreach (var id in (locks.FileIds ?? []).Concat(avatarFile is { } current ? [current] : []).Distinct().Order())
         { await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM media.files WHERE id={id} AND owner_id={locks.OwnerId} FOR UPDATE", ct); }
         var now = await clock.ReadAsync(db, ct);
         var result = await operation(new Session(db, clock, locks.OwnerId, allowance, now, roleActor), ct);

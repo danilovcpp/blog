@@ -9,7 +9,7 @@ public sealed record ModerationCommentDto(Guid Id, Guid PublicationId, Guid? Par
     AuthorRef Author, DateTimeOffset CreatedAt, DateTimeOffset? EditedAt, Guid Version)
 {
     public static ModerationCommentDto From(CommentSnapshot item) => new(item.Id, item.PublicationId, item.ParentId, item.Depth,
-        Enum.Parse<CommentEditState>(item.State), item.Content, new AuthorRef(item.AuthorId), item.CreatedAt, item.EditedAt, item.Version);
+        Enum.Parse<CommentEditState>(item.State), item.Content, new AuthorRef(item.AuthorId, item.AuthorAvatar), item.CreatedAt, item.EditedAt, item.Version);
 }
 
 public static class ModerationRequest

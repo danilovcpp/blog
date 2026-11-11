@@ -12,7 +12,7 @@ public record WorkspaceCard(Guid Id, string Title, string Slug, string? Descript
     public static WorkspaceCard From(ClassifiedPublication value)
     {
         var p = value.Publication;
-        return new(p.Id, p.Title, p.Slug, p.Description, p.CoverUrl, new(p.AuthorId), p.CreatedAt, p.UpdatedAt, p.FirstPublishedAt,
+        return new(p.Id, p.Title, p.Slug, p.Description, p.CoverUrl, new(p.AuthorId, p.AuthorAvatar), p.CreatedAt, p.UpdatedAt, p.FirstPublishedAt,
             value.Categories.Select(TaxonomyDto.From).ToArray(), value.Tags.Select(TaxonomyDto.From).ToArray(), p.LikeCount, p.ViewCount, p.IsLikedByCurrentUser, p.State, p.Version, p.CoverFileId);
     }
 }

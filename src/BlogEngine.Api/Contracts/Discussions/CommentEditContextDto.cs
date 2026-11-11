@@ -9,5 +9,5 @@ public sealed record CommentEditContextDto(Guid Id, Guid PublicationId, Guid? Pa
     AuthorRef Author, DateTimeOffset CreatedAt, DateTimeOffset? EditedAt, Guid Version)
 {
     public static CommentEditContextDto From(CommentSnapshot item) => new(item.Id, item.PublicationId, item.ParentId, item.Depth,
-        Enum.Parse<CommentEditState>(item.State), item.Content, new AuthorRef(item.AuthorId), item.CreatedAt, item.EditedAt, item.Version);
+        Enum.Parse<CommentEditState>(item.State), item.Content, new AuthorRef(item.AuthorId, item.AuthorAvatar), item.CreatedAt, item.EditedAt, item.Version);
 }

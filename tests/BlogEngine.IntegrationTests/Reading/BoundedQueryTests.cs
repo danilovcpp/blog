@@ -19,7 +19,7 @@ public sealed class BoundedQueryTests(PostgresFixture postgres) : IClassFixture<
     [InlineData(100, false)]
     [InlineData(20, true)]
     [InlineData(100, true)]
-    public async Task FeedUsesAtMostFiveDataQueriesAndFixedAuthenticationQueries(int size, bool authenticated)
+    public async Task FeedUsesAtMostSixDataQueriesIncludingOneAvatarBatchAndFixedAuthenticationQueries(int size, bool authenticated)
     {
         var ct = TestContext.Current.CancellationToken; var capture = new ReadingSqlCapture();
         await using var f = await StartAsync(postgres, ct, capture); await ReadingDataset.SeedAsync(f, ct);
@@ -29,7 +29,7 @@ public sealed class BoundedQueryTests(PostgresFixture postgres) : IClassFixture<
             capture.Clear();
             var page = await ReadingContractTests.GetAsync(f.Anonymous, ReadingDataset.Query(pageSize: size, categories: categories, tags: tags), ct);
             var data = capture.Commands.Where(c => !c.IsAuthentication).ToArray();
-            Assert.InRange(data.Length, 3, 5);
+            Assert.InRange(data.Length, 3, 6);
             Assert.Equal(authenticated ? 3 : 0, capture.Commands.Count(c => c.IsAuthentication));
             var feed = Assert.Single(data, c => c.Sql.Contains("FROM publishing.publications", StringComparison.Ordinal));
             Assert.DoesNotContain("markdown", feed.Sql, StringComparison.OrdinalIgnoreCase); Assert.DoesNotContain("COUNT(", feed.Sql, StringComparison.OrdinalIgnoreCase);
@@ -37,7 +37,7 @@ public sealed class BoundedQueryTests(PostgresFixture postgres) : IClassFixture<
             Assert.DoesNotContain("SELECT *", feed.Sql, StringComparison.OrdinalIgnoreCase);
             if (authenticated) { Assert.Contains("EXISTS", feed.Sql, StringComparison.Ordinal); Assert.Contains("engagement.likes", feed.Sql, StringComparison.Ordinal); }
             Assert.All(data, command => Assert.DoesNotContain("UPDATE ", command.Sql, StringComparison.Ordinal));
-            if (PaginationAndFilterTests.Ids(page).Length != 0) { Assert.Equal(5, data.Length); }
+            if (PaginationAndFilterTests.Ids(page).Length != 0) { Assert.Equal(6, data.Length); }
         }
     }
 

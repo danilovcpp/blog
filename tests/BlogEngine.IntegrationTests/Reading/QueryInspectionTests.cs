@@ -42,7 +42,7 @@ public sealed class QueryInspectionTests(PostgresFixture postgres) : IClassFixtu
                         var available = offset >= expected.Count ? [] : expected.Skip((int)offset).Take(size + 1).ToArray();
                         Assert.Equal(available.Take(size), PaginationAndFilterTests.Ids(page));
                         var commands = capture.Commands; var data = commands.Where(c => !c.IsAuthentication).ToArray();
-                        Assert.InRange(data.Length, 1, 5); Assert.Equal(3, commands.Count(c => c.IsAuthentication));
+                        Assert.InRange(data.Length, 1, 6); Assert.Equal(3, commands.Count(c => c.IsAuthentication));
                         var feed = Assert.Single(data, c => c.Sql.Contains("FROM publishing.publications", StringComparison.Ordinal));
                         Assert.Equal(offset, feed.Parameters.Single(p => p.ParameterName == "offset").Value);
                         Assert.Equal(size + 1, feed.Parameters.Single(p => p.ParameterName == "fetch_size").Value);
@@ -75,7 +75,7 @@ public sealed class QueryInspectionTests(PostgresFixture postgres) : IClassFixtu
             dataset = 250,
             postgres = "18.6",
             scenarios,
-            maximumDataQueries = 5,
+            maximumDataQueries = 6,
             interpretation = "Bounded projections, exact public predicate and deterministic indexed sort. Plans are from actual parameterized HTTP SQL. Sequential scans on 250 rows or empty/deep pages are valid; SC-005 requires the final dedicated dataset and host."
         }), ct);
     }

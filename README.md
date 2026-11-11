@@ -219,6 +219,15 @@ status/complete/cancel, устойчивую фоновую обработку �
 следующим фазам. Проверки и ограничения — в
 [отчёте Phase 3](specs/002-files-avatars/phase3-report.md).
 
+Phase 4 добавляет изображения и вложения публикаций. Phase 5 — собственный
+аватар для любой роли: `GET /api/v1/me/avatar` возвращает состояние и версию,
+Avatar upload требует `X-Resource-Version`, а versioned DELETE снимает назначение.
+Публичны только текущие PNG 256/512; замена сразу закрывает старые URL.
+`Me` содержит `avatar`/`avatarVersion`, авторство — nullable `avatar`.
+Результаты review и проверок — в [отчёте Phase 5](specs/002-files-avatars/phase5-report.md).
+Физическая очистка, эксплуатационная приёмка и переход production consumers
+остаются следующими фазами.
+
 ### Изолированные фикстуры
 
 `PostgresFixture` создаёт одноразовый контейнер, а для каждого сценария — отдельную

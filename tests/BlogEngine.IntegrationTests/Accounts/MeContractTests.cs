@@ -66,7 +66,7 @@ public sealed class MeContractTests(PostgresFixture postgres) : IClassFixture<Po
     }
 
     [Fact]
-    public async Task MeBootstrapsOnceReturnsOnlyIdAndOrderedRolesAndRefreshesTheSameJwt()
+    public async Task MeBootstrapsOnceReturnsAvatarAndOrderedRolesAndRefreshesTheSameJwt()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var database = await postgres.CreateDatabaseAsync(BootstrapTests.Context, ct);
@@ -86,7 +86,9 @@ public sealed class MeContractTests(PostgresFixture postgres) : IClassFixture<Po
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             Assert.True(response.Headers.CacheControl!.NoStore);
             var json = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
-            Assert.Equal(["id", "roles"], json.EnumerateObject().Select(p => p.Name));
+            Assert.Equal(["id", "roles", "avatar", "avatarVersion"], json.EnumerateObject().Select(p => p.Name));
+            Assert.Equal(JsonValueKind.Null, json.GetProperty("avatar").ValueKind);
+            Assert.NotEqual(Guid.Empty, json.GetProperty("avatarVersion").GetGuid());
             Assert.Equal("[\"Reader\"]", json.GetProperty("roles").GetRawText());
             return json.GetProperty("id").GetGuid();
         }));

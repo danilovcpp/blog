@@ -18,7 +18,7 @@ public sealed class UploadTransferStore(BlogDbContext db, IMediaWriteStore write
             var upload = await session.LockUploadAsync(uploadId, token) ?? throw new DomainError("resource_not_found");
             if (upload.EffectiveState(session.UtcNow) is not (MediaUploadState.AwaitingContent or MediaUploadState.ContentReceived))
             { throw new DomainError("invalid_state"); }
-            AccessPolicy.Demand(session.RoleActor!, ActorAction.CreatePublication);
+            if (upload.Purpose != MediaPurpose.Avatar) { AccessPolicy.Demand(session.RoleActor!, ActorAction.CreatePublication); }
             var generation = upload.Claim(session.UtcNow, options.Value.Transfers.TotalTimeout + TimeSpan.FromSeconds(30));
             await db.SaveChangesAsync(token);
             MediaObject? plan = null;

@@ -14,11 +14,16 @@ namespace BlogEngine.Infrastructure.ReadModels;
 
 public sealed class WorkspaceQueries(BlogDbContext db)
 {
-    internal Expression<Func<Publication, PublicationSnapshot>> Projection(Guid? actorId, bool markdown) => p =>
+    internal Expression<Func<Publication, PublicationSnapshot>> Projection(Guid? actorId, bool markdown)
+    {
+        var avatars = AuthorAvatarQuery.Assignments(db);
+        return p =>
         new PublicationSnapshot(p.Id, p.Title, p.Slug, markdown ? p.Markdown : null, p.Description, p.CoverUrl, p.AuthorId, p.State,
             p.CreatedAt, p.UpdatedAt, p.FirstPublishedAt, p.Version, p.LikeCount, p.ViewCount,
             actorId != null && db.Likes.Any(l => l.PublicationId == p.Id && l.UserId == actorId),
-            db.PublicationUsages.Where(u => u.PublicationId == p.Id && u.Role == MediaUsageRole.Cover).Select(u => (Guid?)u.FileId).SingleOrDefault());
+            db.PublicationUsages.Where(u => u.PublicationId == p.Id && u.Role == MediaUsageRole.Cover).Select(u => (Guid?)u.FileId).SingleOrDefault(),
+            AvatarReference.From(avatars.Where(a => a.AuthorId == p.AuthorId).Select(a => a.FileId).SingleOrDefault()));
+    }
 
     public async Task<ClassifiedPublication> GetAsync(CurrentActor actor, Guid id, CancellationToken ct)
     {

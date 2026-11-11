@@ -13,7 +13,7 @@ public sealed record PublicationDto(Guid Id, string Title, string Slug, string? 
     public static PublicationDto From(ClassifiedPublication value)
     {
         var p = value.Publication;
-        return new(p.Id, p.Title, p.Slug, p.Description, p.CoverUrl, new(p.AuthorId), p.CreatedAt, p.UpdatedAt, p.FirstPublishedAt!.Value,
+        return new(p.Id, p.Title, p.Slug, p.Description, p.CoverUrl, new(p.AuthorId, p.AuthorAvatar), p.CreatedAt, p.UpdatedAt, p.FirstPublishedAt!.Value,
             value.Categories.Select(TaxonomyDto.From).ToArray(), value.Tags.Select(TaxonomyDto.From).ToArray(), p.LikeCount, p.ViewCount, p.IsLikedByCurrentUser, p.Markdown!,
             p.CoverFileId, value.Media.InlineImages, value.Media.Attachments);
     }

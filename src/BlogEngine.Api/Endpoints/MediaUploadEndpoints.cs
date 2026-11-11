@@ -1,4 +1,5 @@
 using BlogEngine.Api.Configuration;
+using BlogEngine.Api.Contracts;
 using BlogEngine.Api.Contracts.Media;
 using BlogEngine.Core.Media.Application;
 using BlogEngine.Core.Media.Contracts;
@@ -19,7 +20,8 @@ public static class MediaUploadEndpoints
             { throw DomainError.Validation("Idempotency-Key"); }
             if (!Enum.TryParse<MediaPurpose>(body.Purpose, out var purpose) || !Enum.IsDefined(purpose) || purpose.ToString() != body.Purpose)
             { throw DomainError.Validation("purpose"); }
-            var upload = await service.InitializeAsync(actor, purpose, body.Name, body.DeclaredSize, body.DeclaredContentType, key, null, ct);
+            Guid? version = purpose == MediaPurpose.Avatar ? ResourceVersion.Read(request) : null;
+            var upload = await service.InitializeAsync(actor, purpose, body.Name, body.DeclaredSize, body.DeclaredContentType, key, version, ct);
             return Results.Created($"/api/v1/media/uploads/{upload.Id:D}", UploadDto.From(upload));
         }).WithName("createMediaUpload");
 

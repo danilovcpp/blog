@@ -36,6 +36,13 @@ public static class MediaRegistration
         services.AddScoped<IMediaUploadProcessor, PublicationImageProcessing>();
         services.AddSingleton<IPublicationImageRenderer, PublicationImageRenderer>();
         services.AddScoped<IPublicationImageStore, MediaProcessingStore>();
+        services.AddScoped<IMediaUploadProcessor, AvatarProcessing>();
+        services.AddSingleton<IAvatarRenderer, AvatarRenderer>();
+        services.AddScoped<IAvatarCompletionStore, AvatarCompletionStore>();
+        services.AddScoped<IAvatarStateStore, AvatarStateStore>();
+        services.AddScoped<AvatarService>();
+        services.AddScoped<AvatarContentQuery>();
+        services.AddScoped<IAuthorAvatarReader, AuthorAvatarQuery>();
         services.AddScoped<IPublicationMediaUsages, PublicationMediaUsages>();
         services.AddScoped<IFileDeletionStore, FileDeletionStore>();
         services.AddScoped<FileDeletion>();

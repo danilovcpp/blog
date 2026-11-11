@@ -1,7 +1,9 @@
 using BlogEngine.Core.Discussions.Contracts;
 using BlogEngine.Core.Discussions.Domain;
+using BlogEngine.Core.Media.Contracts;
 using BlogEngine.Core.Publishing.Contracts;
 using BlogEngine.Core.Shared;
+using BlogEngine.Infrastructure.ReadModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlogEngine.Infrastructure.Persistence.Discussions;
@@ -21,7 +23,7 @@ public sealed class CommentWriteStore(BlogDbContext db, IPublicationWriteScope s
             var comment = create(parent, session.UtcNow); db.Comments.Add(comment);
             await db.SaveChangesAsync(token);
             await AdjustAncestorsAsync(comment, 1, token);
-            return CommentSnapshot.From(comment);
+            return await SnapshotAsync(comment.Id, token);
         }, ct);
 
     public async Task<CommentSnapshot> MutateAsync(Guid commentId, Action<Comment, DateTimeOffset> mutation, CancellationToken ct)
@@ -40,8 +42,16 @@ public sealed class CommentWriteStore(BlogDbContext db, IPublicationWriteScope s
             // Desired-state no-ops retain version/dates and produce zero ancestor writes.
             var delta = (comment.State == CommentState.Visible ? 1 : 0) - (wasVisible ? 1 : 0);
             if (delta != 0) { await AdjustAncestorsAsync(comment, delta, token); }
-            return CommentSnapshot.From(comment);
+            return await SnapshotAsync(comment.Id, token);
         }, ct);
+    }
+
+    private Task<CommentSnapshot> SnapshotAsync(Guid id, CancellationToken ct)
+    {
+        var avatars = AuthorAvatarQuery.Assignments(db);
+        return db.Comments.AsNoTracking().Where(c => c.Id == id).Select(c => new CommentSnapshot(c.Id, c.PublicationId, c.ParentId, c.Depth,
+            c.State.ToString(), c.Text, c.AuthorId, c.CreatedAt, c.EditedAt, c.Version,
+            AvatarReference.From(avatars.Where(a => a.AuthorId == c.AuthorId).Select(a => a.FileId).SingleOrDefault()))).SingleAsync(ct);
     }
 
     private Task AdjustAncestorsAsync(Comment comment, int delta, CancellationToken ct)

@@ -34,7 +34,8 @@ public sealed class ReadingContractTests(PostgresFixture postgres) : IClassFixtu
             AssertFields(page, ["items", "page", "pageSize", "hasNextPage"]);
             foreach (var card in page.GetProperty("items").EnumerateArray())
             {
-                AssertFields(card, CardFields); AssertFields(card.GetProperty("author"), ["id"]);
+                AssertFields(card, CardFields); AssertFields(card.GetProperty("author"), ["id", "avatar"]);
+                Assert.Equal(JsonValueKind.Null, card.GetProperty("author").GetProperty("avatar").ValueKind);
                 Assert.Equal(ReadingDataset.AuthorId, card.GetProperty("author").GetProperty("id").GetGuid());
                 foreach (var date in new[] { "createdAt", "updatedAt", "firstPublishedAt" }) { Assert.EndsWith("Z", card.GetProperty(date).GetString()); }
                 foreach (var field in new[] { "categories", "tags" })

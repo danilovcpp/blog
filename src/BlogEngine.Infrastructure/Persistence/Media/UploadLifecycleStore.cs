@@ -12,11 +12,17 @@ public sealed class UploadLifecycleStore(BlogDbContext db, DatabaseClock clock, 
     {
         var prior = await FindKeyAsync(request.OwnerId, request.IdempotencyKey, ct);
         if (prior is not null) { return await ReplayAsync(prior, request, ct); }
-        return await writes.ExecuteAsync(new(request.OwnerId, RoleActorId: request.OwnerId, DemandRole: false), async (session, token) =>
+        return await writes.ExecuteAsync(new(request.OwnerId, RoleActorId: request.Purpose == MediaPurpose.Avatar ? null : request.OwnerId,
+            Avatar: request.Purpose == MediaPurpose.Avatar, DemandRole: false), async (session, token) =>
         {
             prior = await FindKeyAsync(request.OwnerId, request.IdempotencyKey, token);
             if (prior is not null) { return await ReplayAsync(prior, request, token); }
-            AccessPolicy.Demand(session.RoleActor!, ActorAction.CreatePublication);
+            if (request.Purpose == MediaPurpose.Avatar)
+            {
+                var state = await db.AvatarStates.AsNoTracking().SingleAsync(a => a.UserId == request.OwnerId, token);
+                if (state.Version != request.ExpectedAvatarVersion) { throw new DomainError("concurrency_conflict"); }
+            }
+            else { AccessPolicy.Demand(session.RoleActor!, ActorAction.CreatePublication); }
             var file = MediaFile.Create(candidate.OwnerId, candidate.Purpose, candidate.OriginalName, candidate.DeclaredContentType, candidate.OriginalSize, session.UtcNow);
             var upload = MediaUpload.Create(file, request.IdempotencyKey, request.ExpectedAvatarVersion, session.UtcNow);
             await session.ReserveAsync(file, upload, token);

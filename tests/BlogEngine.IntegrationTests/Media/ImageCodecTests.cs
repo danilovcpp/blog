@@ -10,6 +10,48 @@ namespace BlogEngine.IntegrationTests.Media;
 public sealed class ImageCodecTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AvatarRendererOrientsThenCentrallyCropsUpscalesAndStripsMetadata(bool jpegOrientation)
+    {
+        var ct = TestContext.Current.CancellationToken; var options = MediaSpoolTests.Settings(); options.Spool.BudgetBytes = 8 * 1024 * 1024;
+        await using var spool = MediaSpoolTests.Spool(options); await spool.StartAsync(ct);
+        using var codec = new SkiaImageCodec(spool, Options.Create(options));
+        using var bitmap = new SKBitmap(60, 20); bitmap.Erase(SKColors.Red);
+        if (jpegOrientation)
+        { for (var y = 0; y < 20; y++) { for (var x = 30; x < 60; x++) { bitmap.SetPixel(x, y, SKColors.Blue); } } }
+        else
+        { for (var y = 0; y < 20; y++) { for (var x = 20; x < 40; x++) { bitmap.SetPixel(x, y, new SKColor(0, 255, 0, 100)); } } }
+        using var image = SKImage.FromBitmap(bitmap); using var encoded = image.Encode(jpegOrientation ? SKEncodedImageFormat.Jpeg : SKEncodedImageFormat.Png, 100);
+        var bytes = encoded.ToArray();
+        if (jpegOrientation)
+        {
+            byte[] exif = [0xff, 0xe1, 0, 34, 69, 120, 105, 102, 0, 0, 73, 73, 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 1, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0];
+            bytes = bytes[..2].Concat(exif).Concat(bytes[2..]).ToArray();
+        }
+        await using var source = await spool.CaptureAsync(new MemoryStream(bytes), bytes.Length, ct);
+        var result = await new AvatarRenderer(codec, spool).RenderAsync(source, jpegOrientation ? "image/jpeg" : "image/png", ct);
+        await using var small = result.Small.Content; await using var large = result.Large.Content;
+        foreach (var (content, size) in new[] { (small, 256), (large, 512) })
+        {
+            await using var input = content.OpenRead(); using var rendered = SKBitmap.Decode(input);
+            Assert.Equal(size, rendered.Width); Assert.Equal(size, rendered.Height);
+            if (jpegOrientation)
+            {
+                var top = rendered.GetPixel(size / 2, size / 4); var bottom = rendered.GetPixel(size / 2, size * 3 / 4);
+                Assert.True(top.Red > 200 && top.Blue < 40); Assert.True(bottom.Blue > 200 && bottom.Red < 40);
+            }
+            else
+            {
+                var center = rendered.GetPixel(size / 2, size / 2); Assert.Equal(100, center.Alpha); Assert.True(center.Green > 250);
+                Assert.True(rendered.GetPixel(size / 4, size / 2).Green > 250);
+            }
+            await using var containerStream = content.OpenRead(); using var container = SKCodec.Create(containerStream);
+            Assert.Equal(SKEncodedImageFormat.Png, container.EncodedFormat); Assert.Equal(SKEncodedOrigin.TopLeft, container.EncodedOrigin);
+        }
+    }
+
+    [Theory]
     [InlineData(3000, 1500, 2560, 1280)]
     [InlineData(3, 2, 3, 2)]
     public async Task PublicationRendererFitsWithoutUpscaleAndPreservesAlpha(int width, int height, int expectedWidth, int expectedHeight)

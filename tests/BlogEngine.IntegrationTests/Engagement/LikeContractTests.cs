@@ -168,7 +168,7 @@ public sealed class LikeContractTests(PostgresFixture postgres) : IClassFixture<
         foreach (var path in new[] { ReadingDataset.Query("popular"), ReadingDataset.Query("popular", categories: [0, 1], tags: [0, 1]), "/api/v1/publications/" + ReadingDataset.Id(2), $"/api/v1/publications/{ReadingDataset.Id(2)}/counters" })
         {
             capture.Clear(); await JsonAsync(await f.Anonymous.GetAsync(path, ct), HttpStatusCode.OK, ct);
-            var data = capture.Commands.Where(c => !c.IsAuthentication).ToArray(); Assert.InRange(data.Length, 1, 5);
+            var data = capture.Commands.Where(c => !c.IsAuthentication).ToArray(); Assert.InRange(data.Length, 1, 6);
             Assert.Contains(data, c => c.Sql.Contains("EXISTS", StringComparison.OrdinalIgnoreCase) && c.Sql.Contains("engagement.likes", StringComparison.Ordinal));
             await using var connection = new NpgsqlConnection(f.Database.ConnectionString); await connection.OpenAsync(ct);
             var plans = new List<object>();

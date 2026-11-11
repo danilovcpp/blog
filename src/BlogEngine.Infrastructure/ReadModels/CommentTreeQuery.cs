@@ -1,5 +1,6 @@
 using BlogEngine.Core.Discussions.Contracts;
 using BlogEngine.Core.Discussions.Domain;
+using BlogEngine.Core.Media.Contracts;
 using BlogEngine.Core.Publishing.Contracts;
 using BlogEngine.Core.ReadModels;
 using BlogEngine.Core.Shared;
@@ -30,11 +31,13 @@ public sealed class CommentTreeQuery(BlogDbContext db, IPublicationReader public
             AND (c.state=0 OR c.visible_descendant_count>0)
             ORDER BY c.created_at,c.id LIMIT {page.FetchSize} OFFSET {page.Offset}
             """;
+        var avatars = AuthorAvatarQuery.Assignments(db);
         var rows = await db.Comments.FromSqlInterpolated(sql).AsNoTracking().OrderBy(c => c.CreatedAt).ThenBy(c => c.Id)
             .Select(c => new CommentItem(c.Id, c.PublicationId, c.ParentId, c.Depth, c.State.ToString(),
                 c.State == CommentState.Visible ? c.Text : null, c.State == CommentState.Visible ? c.AuthorId : null,
                 c.CreatedAt, c.EditedAt, db.Comments.Any(child => child.PublicationId == publicationId && child.ParentId == c.Id &&
-                    (child.State == CommentState.Visible || child.VisibleDescendantCount > 0)))).ToListAsync(ct);
+                    (child.State == CommentState.Visible || child.VisibleDescendantCount > 0)),
+                AvatarReference.From(avatars.Where(a => c.State == CommentState.Visible && a.AuthorId == c.AuthorId).Select(a => a.FileId).SingleOrDefault()))).ToListAsync(ct);
         return PageResult<CommentItem>.FromLookahead(rows, page);
     }
 }

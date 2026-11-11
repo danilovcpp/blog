@@ -16,7 +16,7 @@ public sealed class OpenApiCompatibilityTests
         var contract = await ContractAsync(TestContext.Current.CancellationToken);
         var schema = contract["components"]!["schemas"]!["ModerationComment"]!;
         var comment = JsonNode.Parse("""
-            {"id":"11111111-1111-1111-1111-111111111111","publicationId":"11111111-1111-1111-1111-111111111111","parentId":null,"depth":1,"state":"Hidden","content":"retained","author":{"id":"11111111-1111-1111-1111-111111111111"},"createdAt":"2026-10-01T00:00:00Z","editedAt":null,"version":"11111111-1111-1111-1111-111111111111"}
+            {"id":"11111111-1111-1111-1111-111111111111","publicationId":"11111111-1111-1111-1111-111111111111","parentId":null,"depth":1,"state":"Hidden","content":"retained","author":{"id":"11111111-1111-1111-1111-111111111111","avatar":null},"createdAt":"2026-10-01T00:00:00Z","editedAt":null,"version":"11111111-1111-1111-1111-111111111111"}
             """)!;
         ConsumerWalkthroughTests.Validate(contract, schema, comment, "moderation");
         foreach (var (field, value) in new (string, JsonNode?)[] { ("content", null), ("id", JsonValue.Create("bad")), ("depth", JsonValue.Create(6)), ("secret", JsonValue.Create("unexpected")) })
@@ -35,7 +35,7 @@ public sealed class OpenApiCompatibilityTests
         var result = await OpenApiDocument.LoadAsync(path, settings, ct);
         Assert.Empty(result.Diagnostic!.Errors);
         var contract = result.Document!;
-        var mediaPath = Path.Combine(Path.GetDirectoryName(path)!, "..", "..", "002-files-avatars", "contracts", "openapi-us2.yaml");
+        var mediaPath = Path.Combine(Path.GetDirectoryName(path)!, "..", "..", "002-files-avatars", "contracts", "openapi-us3.yaml");
         var media = await OpenApiDocument.LoadAsync(mediaPath, settings, ct); Assert.Empty(media.Diagnostic!.Errors);
         foreach (var (route, item) in media.Document!.Paths) { contract.Paths.Add(route, item); }
         foreach (var (name, schema) in media.Document.Components!.Schemas!) { contract.Components!.Schemas![name] = schema; }

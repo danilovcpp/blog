@@ -17,7 +17,8 @@ public sealed class MediaProcessingStore(BlogDbContext db, DatabaseClock clock, 
     {
         var known = await MediaUploadTransitions.FindOwnedAsync(db, ownerId, uploadId, ct);
         if (known.State == MediaUploadState.Completed) { return new(await SnapshotAsync(known, ct), null); }
-        return await writes.ExecuteAsync(new(ownerId, RoleActorId: ownerId, FileIds: [known.FileId], DemandRole: false), async (session, token) =>
+        return await writes.ExecuteAsync(new(ownerId, RoleActorId: known.Purpose == MediaPurpose.Avatar ? null : ownerId,
+            Avatar: known.Purpose == MediaPurpose.Avatar, FileIds: [known.FileId], DemandRole: false), async (session, token) =>
         {
             var upload = await session.LockUploadAsync(uploadId, token) ?? throw new DomainError("resource_not_found");
             if (upload.State == MediaUploadState.Completed) { return new UploadCompletionAttempt(await SnapshotAsync(upload, token), null); }
@@ -42,6 +43,11 @@ public sealed class MediaProcessingStore(BlogDbContext db, DatabaseClock clock, 
             await MediaUploadTransitions.TerminateAsync(db, session, upload, MediaUploadState.Rejected, "forbidden", ct);
             return "forbidden";
         }
+        if (upload.Purpose == MediaPurpose.Avatar && !await db.AvatarStates.AnyAsync(a => a.UserId == upload.OwnerId && a.Version == upload.ExpectedAvatarVersion, ct))
+        {
+            await MediaUploadTransitions.TerminateAsync(db, session, upload, MediaUploadState.Rejected, "concurrency_conflict", ct);
+            return "concurrency_conflict";
+        }
         return null;
     }
 
@@ -60,7 +66,8 @@ public sealed class MediaProcessingStore(BlogDbContext db, DatabaseClock clock, 
     {
         var known = await db.MediaUploads.AsNoTracking().SingleOrDefaultAsync(u => u.Id == uploadId, ct);
         if (known is null || known.State != MediaUploadState.Processing) { return null; }
-        return await writes.ExecuteAsync<MediaProcessingClaim?>(new(known.OwnerId, RoleActorId: known.OwnerId, FileIds: [known.FileId], DemandRole: false), async (session, token) =>
+        return await writes.ExecuteAsync<MediaProcessingClaim?>(new(known.OwnerId, RoleActorId: known.Purpose == MediaPurpose.Avatar ? null : known.OwnerId,
+            Avatar: known.Purpose == MediaPurpose.Avatar, FileIds: [known.FileId], DemandRole: false), async (session, token) =>
         {
             var upload = await session.LockUploadAsync(uploadId, token);
             if (upload is null || upload.State != MediaUploadState.Processing || upload.LeaseUntil > session.UtcNow || upload.NextAttemptAt > session.UtcNow) { return null; }

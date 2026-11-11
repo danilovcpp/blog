@@ -17,11 +17,11 @@ public static class OpenApiContract
         if (result.Diagnostic?.Errors.Count > 0 || result.Document is null)
         { throw new InvalidOperationException("The normative API contract is invalid."); }
         var contract = result.Document;
-        // Publish only the implemented US1/US2 slice until the full feature/consumer contract is assembled.
-        await using var mediaStream = typeof(OpenApiContract).Assembly.GetManifestResourceStream("BlogEngine.Api.media-us2.yaml")
-            ?? throw new InvalidOperationException("The Media US1/US2 contract is missing.");
+        // Publish only the implemented US1/US2/US3 slice until the full feature/consumer contract is assembled.
+        await using var mediaStream = typeof(OpenApiContract).Assembly.GetManifestResourceStream("BlogEngine.Api.media-us3.yaml")
+            ?? throw new InvalidOperationException("The Media US1/US2/US3 contract is missing.");
         var media = await OpenApiDocument.LoadAsync(mediaStream, "yaml", settings, ct);
-        if (media.Diagnostic?.Errors.Count > 0 || media.Document is null) { throw new InvalidOperationException("The Media US1/US2 contract is invalid."); }
+        if (media.Diagnostic?.Errors.Count > 0 || media.Document is null) { throw new InvalidOperationException("The Media US1/US2/US3 contract is invalid."); }
         foreach (var (path, item) in media.Document.Paths) { contract.Paths.Add(path, item); }
         foreach (var (name, schema) in media.Document.Components!.Schemas!)
         { contract.Components!.Schemas![name] = schema; }

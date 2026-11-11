@@ -10,7 +10,7 @@ public abstract record PublicCommentDto(Guid Id, Guid PublicationId, Guid? Paren
     DateTimeOffset CreatedAt, DateTimeOffset? EditedAt, bool HasReplies)
 {
     public static PublicCommentDto From(CommentItem item) => item.State == "Visible"
-        ? new VisibleCommentDto(item.Id, item.PublicationId, item.ParentId, item.Depth, item.CreatedAt, item.EditedAt, item.HasReplies, item.Content!, new AuthorRef(item.AuthorId!.Value))
+        ? new VisibleCommentDto(item.Id, item.PublicationId, item.ParentId, item.Depth, item.CreatedAt, item.EditedAt, item.HasReplies, item.Content!, new AuthorRef(item.AuthorId!.Value, item.AuthorAvatar))
         : new CommentPlaceholderDto(item.Id, item.PublicationId, item.ParentId, item.Depth, item.CreatedAt, item.EditedAt, item.HasReplies, Enum.Parse<PlaceholderState>(item.State));
 }
 

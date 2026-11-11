@@ -9,7 +9,7 @@ using NpgsqlTypes;
 
 namespace BlogEngine.Infrastructure.ReadModels;
 
-public sealed class PublicFeedQuery(BlogDbContext db) : IPublicFeedReader
+public sealed class PublicFeedQuery(BlogDbContext db, IAuthorAvatarReader avatars) : IPublicFeedReader
 {
     public async Task<PageResult<PublicationFeed>> ReadAsync(PublicationFeedRequest request, Guid? actorId, CancellationToken cancellationToken)
     {
@@ -49,8 +49,9 @@ public sealed class PublicFeedQuery(BlogDbContext db) : IPublicFeedReader
         var page = PageResult<FeedRow>.FromLookahead(rows, request.Page);
         if (page.Items.Count == 0) { return new([], page.Page, page.PageSize, page.HasNextPage); }
         var classification = await PublicationClassificationQuery.LoadAsync(db, page.Items.Select(p => p.Id).ToArray(), cancellationToken);
+        var authorAvatars = await avatars.ReadAsync(page.Items.Select(p => p.AuthorId).Distinct().ToArray(), cancellationToken);
         await tx.CommitAsync(cancellationToken);
-        return new(page.Items.Select(p => new PublicationFeed(p.Id, p.Title, p.Slug, p.Description, p.CoverFileId is { } cover ? PublicationMediaUrls.Display(p.Id, cover) : p.CoverUrl, new(p.AuthorId), p.CreatedAt, p.UpdatedAt,
+        return new(page.Items.Select(p => new PublicationFeed(p.Id, p.Title, p.Slug, p.Description, p.CoverFileId is { } cover ? PublicationMediaUrls.Display(p.Id, cover) : p.CoverUrl, new(p.AuthorId, authorAvatars[p.AuthorId]), p.CreatedAt, p.UpdatedAt,
             p.FirstPublishedAt, classification.Categories[p.Id].ToArray(), classification.Tags[p.Id].ToArray(), p.LikeCount, p.ViewCount, p.IsLikedByCurrentUser, p.CoverFileId)).ToArray(),
             page.Page, page.PageSize, page.HasNextPage);
     }

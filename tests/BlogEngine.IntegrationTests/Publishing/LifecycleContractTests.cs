@@ -48,7 +48,8 @@ public sealed class LifecycleContractTests(PostgresFixture postgres) : IClassFix
         var bySlug = await JsonAsync(await f.Anonymous.GetAsync("/api/v1/publications/by-slug/hello", ct), HttpStatusCode.OK, ct);
         Assert.Equal(publicDetail.GetRawText(), bySlug.GetRawText());
         Assert.False(publicDetail.TryGetProperty("version", out _)); Assert.False(publicDetail.TryGetProperty("state", out _));
-        Assert.Single(publicDetail.GetProperty("author").EnumerateObject()); Assert.Equal(0, publicDetail.GetProperty("viewCount").GetInt64());
+        Assert.Equal(2, publicDetail.GetProperty("author").EnumerateObject().Count()); Assert.Equal(JsonValueKind.Null, publicDetail.GetProperty("author").GetProperty("avatar").ValueKind);
+        Assert.Equal(0, publicDetail.GetProperty("viewCount").GetInt64());
         var changed = await JsonAsync(await SendAsync(author, HttpMethod.Put, path, Version(published), Content(markdown: "changed"), ct), HttpStatusCode.OK, ct);
         Assert.Equal("changed", (await JsonAsync(await f.Anonymous.GetAsync(path, ct), HttpStatusCode.OK, ct)).GetProperty("markdown").GetString());
         using (var slug = await SendAsync(author, HttpMethod.Put, path, Version(changed), Content(slug: "new"), ct)) { Assert.Equal(HttpStatusCode.Conflict, slug.StatusCode); }

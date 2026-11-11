@@ -1,4 +1,5 @@
 using BlogEngine.Core.Discussions.Domain;
+using BlogEngine.Core.Media.Contracts;
 
 namespace BlogEngine.Core.Discussions.Contracts;
 
@@ -10,11 +11,11 @@ public interface ICommentWriteStore
 }
 
 public sealed record CommentSnapshot(Guid Id, Guid PublicationId, Guid? ParentId, int Depth, string State, string? Content,
-    Guid AuthorId, DateTimeOffset CreatedAt, DateTimeOffset? EditedAt, Guid Version)
+    Guid AuthorId, DateTimeOffset CreatedAt, DateTimeOffset? EditedAt, Guid Version, AvatarReference? AuthorAvatar = null)
 {
     public static CommentSnapshot From(Comment comment) => new(comment.Id, comment.PublicationId, comment.ParentId, comment.Depth,
         comment.State.ToString(), comment.Text, comment.AuthorId, comment.CreatedAt, comment.EditedAt, comment.Version);
 }
 
 public sealed record CommentItem(Guid Id, Guid PublicationId, Guid? ParentId, int Depth, string State, string? Content,
-    Guid? AuthorId, DateTimeOffset CreatedAt, DateTimeOffset? EditedAt, bool HasReplies);
+    Guid? AuthorId, DateTimeOffset CreatedAt, DateTimeOffset? EditedAt, bool HasReplies, AvatarReference? AuthorAvatar = null);
