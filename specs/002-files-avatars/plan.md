@@ -31,7 +31,10 @@ SkiaSharp и SkiaSharp.NativeAssets.Linux.NoDependencies 4.155.0.
 Garage `dxflrs/garage:v2.5.0`, два закрытых bucket, постоянные metadata/data
 volumes. Manifest digest Garage закрепляется до acceptance запуска во всех
 deployment/test manifests, без floating tag. Spool — отдельный непубличный
-volume с ограничением места и автоматическим удалением.
+volume для каждой API replica, сохраняемый при перезапуске этой реплики.
+Процесс владеет томом эксклюзивно и до readiness и приёма transfers удаляет
+оставшиеся временные файлы Media. Это возвращает место после аварийного
+завершения. Общий бюджет тома проверяется при загрузке, выдаче и обработке.
 
 **Testing**: существующие xUnit v3/VSTest, Testcontainers PostgreSQL;
 новая реальная Garage fixture с тем же image pin. HTTP-тесты через ApiFactory,
@@ -61,8 +64,21 @@ No-store на выдаче соблюдает пределы 60 секунд/5 �
 на API replica: 4 одновременных byte transfers суммарно, spool budget 1 GiB,
 1 image decode worker, processing batch 20; API memory budget минимум 1 GiB.
 User quota считает исходные размеры; физические производные планируются
-отдельно. Budget exhaustion — временная ошибка с Retry-After. Limits
-проверяются stress-сценарием и повышаются вместе с ресурсами оператора.
+отдельно. Budget exhaustion — временная ошибка с Retry-After. Приёмочный
+контейнер API ограничен 1 GiB RAM. Четыре одновременных transfers вместе
+с одной декодировкой изображения близко к пределу пикселей должны пройти
+с измеренным пиком ниже 1 GiB, без OOM и буферизации целого тела в RAM.
+Stress-проверка включает аварийную остановку во время transfer и повторный
+запуск на том же томе. Диапазон очистки — 10 000 сохранённых
+Retired/Deleted object records на старте/восстановлении и 1 000 новых
+retirements за любые 24 часа. Expiry допускает до 1 000 просроченных uploads на
+старте/восстановлении и 1 000 новых expiries за любые 24 часа, включая
+uploads без объектов. Их retirements учитываются в общем лимите объектов.
+Один worker каждые 5 минут выделяет три независимых пакета до 100 записей
+для due object jobs, expiry и reconciliation. Каждая очередь получает свой
+пакет даже при backlog в других очередях. До activation и при изменении
+нагрузки проверяются полный обход за ≤12 часов и восстановление backlog
+за ≤24 часа с продолжающимися arrivals в этом диапазоне.
 
 ## Constitution Check
 
@@ -71,9 +87,9 @@ GATE до Phase 0: spec и существующая база проверены;
 
 | Принцип | Решение и доказательство при реализации | До / после |
 |---|---|---|
-| I: модульность | Media владеет lifecycle/usage/avatar; Publishing вызывает Media.Contracts; обратного ребра нет; graph tests | PASS / PASS |
+| I: модульность | Media владеет lifecycle/usage/avatar; Accounts владеет role guard; Publishing и Discussions получают avatar через Media.Contracts; graph tests | PASS / PASS |
 | II: C# | async/cancellation, Options, bounded workers; build/analyzers/format | PASS / PASS |
-| III: данные | additive migration, FK/CHECK/UNIQUE, owner lock, UUID versions, короткие tx без S3; SQL/EXPLAIN и races | PASS / PASS |
+| III: данные | additive migration, FK/CHECK/UNIQUE для purpose/state/object kind, role и owner locks, UUID versions, короткие tx без S3; SQL/EXPLAIN и races | PASS / PASS |
 | IV: API/security | OpenAPI delta + aggregate, resource authorization, ProblemDetails, binary route validation, закрытые buckets, consumer transition | PASS / PASS |
 | V: тесты | unit инварианты, реальные PostgreSQL/Garage HTTP suites; negative/fault/migration/restore gates | PASS / PASS |
 | VI: эксплуатация | validated options, least privileges, schema+bucket readiness, process-only liveness, durable cleanup/recovery | PASS / PASS |
@@ -93,6 +109,7 @@ specs/002-files-avatars/
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
+├── tasks.md
 ├── references/source-constraints.md
 ├── checklists/requirements.md
 └── contracts/
@@ -101,18 +118,19 @@ specs/002-files-avatars/
     └── operations.md
 ```
 
-`tasks.md` создаёт следующая команда `$speckit-tasks`; сейчас не создаётся.
-
 ### Source Code (repository root; новые каталоги — проект реализации)
 
 ```text
 src/BlogEngine.Core/
-├── Accounts/Contracts/                  # текущие identity/roles
+├── Accounts/Contracts/                  # identity, roles, role write guard
+├── Discussions/                        # command snapshot с авторством
 ├── Media/{Domain,Application,Contracts}/ # новый модуль
 ├── Publishing/                         # atomic media registrations
 └── ReadModels/                         # author/avatar/media contracts
 src/BlogEngine.Infrastructure/
 ├── Media/                              # Garage, PNG, disk spool
+├── Persistence/Accounts/                # advisory role lock и role write guard
+├── Persistence/Discussions/             # comment command snapshot
 ├── Persistence/Media/                   # mappings, tx adapters
 ├── Persistence/Publishing/              # write scope и command snapshot
 ├── Persistence/Migrations/              # additive migration
@@ -135,7 +153,8 @@ Media выделяется namespace так же, как остальные мо
 ## Design: ownership, transactions and lifecycle
 
 Граф Core: Media → Accounts.Contracts; Publishing → Accounts.Contracts +
-Media.Contracts; ReadModels → существующие контракты + Media.Contracts.
+Media.Contracts; Discussions → Publishing.Contracts + Media.Contracts
+и существующие контракты; ReadModels → существующие контракты + Media.Contracts.
 Media.Contracts предоставляет операции usage внутри существующего publication
 write scope. Publishing владеет доступом/версией/lifecycle статьи; Media —
 проверкой owner/Ready/purpose и registrations. Реализации делят connection/tx,
@@ -143,10 +162,43 @@ write scope. Publishing владеет доступом/версией/lifecycle
 в том же commit. Delete file проверяет собственные usages/current avatar,
 без обратного вызова Publishing. Публичное чтение компонуется в ReadModels/API.
 
-Порядок locks для всех writers: publication при наличии → allowance owner →
-avatar state при наличии → files по UUID → uploads/jobs. Attach vs delete
-защищены owner lock и FK; ссылки/текст — publication version. Никакая tx
-не удерживается при Garage/network/image processing.
+Accounts предоставляет `IAccountRoleWriteGuard`: адаптер в транзакции
+вызывающего с READ COMMITTED берёт существующий per-actor advisory xact lock.
+Текущие локальные роли читаются отдельным SQL-запросом после получения lock.
+`RoleAdministrationStore` использует тот же ключ при
+grant/revoke. Guard применяется к новым обычным init, complete, Ready commit,
+к claim и replay обычного PUT до чтения тела и к командам записи публикации.
+Guard проверяет наличие текущей роли Author/Admin до блокировки upload.
+Разрешённый claim может закончить запись staging после revoke; проверка
+complete/Ready продолжает требовать текущие права. В publication write scope
+guard проверяет текущие роли до publication lock: сведения о managed links
+могут стать доступны лишь после захвата publication lock. Транзакция удерживает
+role lock до commit. Если revoke закоммичен первым, действует изменённый набор
+ролей. Если первым закоммичен разрешённый переход, сохраняется его результат.
+Worker использует сохранённый локальный actor ID. Вызов внешнего Identity
+для этой проверки не требуется. Operator сохраняет прежние Accounts grants.
+
+Порядок locks для writers: Accounts role guard при наличии → publication
+при наличии → allowance owner → avatar state при наличии → files по UUID →
+uploads/jobs. Attach vs delete защищены owner lock и FK; ссылки/текст —
+publication version. Транзакции завершаются до Garage/network/image processing.
+Активные регистрации и текущий аватар ссылаются на Ready files подходящего
+purpose. Ready file и активные representations ссылаются на объекты того же
+файла с требуемыми kind и state. Цели FK с изменяемым state защищаются
+нечастичными UNIQUE indexes PostgreSQL. Миграция создаёт эти FK отдельно от
+отслеживаемых EF relationships, чтобы state оставался изменяемым полем.
+FK и порядок переходов описаны в модели данных.
+
+`IAuthorAvatarReader` в Media.Contracts возвращает nullable `AvatarReference`
+для ограниченного набора авторов. Публичные и рабочие чтения запрашивают его
+в согласованном snapshot. `PublicationStore` и `CommentWriteStore` используют
+принадлежащий Media внутренний SQL-фрагмент `AuthorAvatarQuery` в итоговой
+проекции своей транзакции при построении `PublicationSnapshot` и
+`CommentSnapshot`. В READ COMMITTED avatar и остальные конкурентно изменяемые
+поля читаются одной SQL-командой. Композиция `IQueryable` остаётся
+в Infrastructure, а Core-контракты передают `AvatarReference?`. DTO формируются
+из этих snapshots, в том числе на create/edit/publish/unpublish и командах
+комментариев. Core Publishing/Discussions зависят от Media.Contracts.
 
 Init с Idempotency-Key сохраняет uploadId/fileId и резерв. PUT имеет fenced
 lease и уникальный object attempt key. Complete сохраняет job; worker после
@@ -163,7 +215,8 @@ Quota = ready original bytes + неистёкшие reservations. Перевод
 не имеет age-based TTL. Детали — [data-model.md](data-model.md).
 
 После проверки owner точный init/Completed replay обрабатывается до guards
-текущей роли/expiry/avatar version: эти guards применяются к новому переходу.
+текущей роли/expiry/avatar version для этих двух операций. PUT claim/replay
+проверяет текущую роль обычной загрузки до чтения тела.
 
 ## Contract and compatibility decisions
 
@@ -186,12 +239,30 @@ avatar; Hidden/Deleted author остаётся null. Batch reads не вызыв
 за именами/email. Binary endpoint metadata обходит JSON middleware buffer,
 сохраняя прежний JSON limit 8 MiB; нельзя просто повысить глобальный предел.
 
+Для raw PUT API применяет лимит назначения 50/10/5 MiB. В первом
+разрешённом AwaitingContent PUT несовпадение с declared size в пределах
+лимита даёт 400, превышение лимита даёт 413. Обе ветки фиксируют Rejected
+и освобождают резерв в fenced lifecycle до ответа, включая определённый
+API отказ чтения из-за лимита Kestrel. Оборванный запрос с неизвестным
+размером остаётся повторяемым. Для уже принятых байтов повтор в пределах
+лимита даёт 204 при точном совпадении, иначе 409. Повтор сверх лимита
+даёт 413. Принятый объект, состояние и резерв при таком повторе сохраняются.
+Upstream proxy с отдельным ceiling 51 MiB может сам отклонить запрос.
+В этом случае состояние загрузки в API сохраняется и доступно через GET.
+
+После spool выдача повторно проверяет права и состояние, включая случаи,
+когда подготовить или верифицировать объект не удалось. При потере доступа
+применяется скрывающий 404, при сохранившемся доступе сбой даёт 503.
+Если решение зависит от роли, итоговый снимок включает актуальные локальные
+роли вместе с ресурсом. Проверка использует идентификатор проверенного
+пользователя, а не ранее прочитанный набор ролей.
+
 ## Review intersections, validation and rollout
 
 | Замечание ревью 2026-10-27 | Обязательная работа в затронутой области |
 |---|---|
 | F01 | create/edit/transitions и новые commands возвращают snapshot своей tx, без re-read после commit; lost-response tests |
-| F05 | feed/detail/workspace/comment author+media читаются одним snapshot; consistency/query count tests |
+| F05 | feed/detail/workspace/comment author+media читаются одним snapshot, включая ответы команд публикаций и комментариев; consistency/query count tests |
 | F06 | aggregate OpenAPI + независимые HTTP/schema tests; deliberate drift проваливает проверку |
 | F07 | readiness: Media schema/read grants + bounded Garage sentinel GET; без DDL/repair |
 | F08 | binary route Accept/body policies, counted streaming вместо JSON buffering |
@@ -201,11 +272,17 @@ backend исправленным. Матрица SC/команды — [quicksta
 topology/options/backup — [operations.md](contracts/operations.md).
 
 Rollout: pins/digest и реальные fixtures → additive migration/grants отдельным
-DDL principal → Garage provisioning → compatible API/consumer deployment →
-readiness/smoke → activation. После первого managed link старый backend
-к записи не допускается. Rollback сохраняет additive schema и закрывает
-mutations либо восстанавливает весь recovery set с учётом новых записей.
-Production Down запрещён.
+DDL principal → Garage provisioning → блокировка и drain старых writers →
+compatible API/consumer deployment → readiness/smoke → activation.
+До развёртывания совместимого API с разрешённой записью оператор закрывает
+legacy write routes на ingress, дожидается завершения активных запросов,
+останавливает старые экземпляры и перекрывает их прямой путь к записи.
+Rollout evidence фиксирует проверку всех экземпляров, отсутствие активных
+legacy write requests и невозможность записи через прежние маршруты и
+прямые доступы. Smoke-проверка с managed link выполняется после этой
+проверки. Rollback сохраняет additive schema и закрывает mutations либо
+восстанавливает весь recovery set с учётом новых записей. Production Down
+запрещён.
 
 ## Complexity Tracking
 

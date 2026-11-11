@@ -11,17 +11,24 @@
   отдельного сервиса. Media владеет файлами, загрузками, квотами, аватаром,
   регистрациями использования файлов и заданиями очистки. Accounts сохраняет
   идентичность и роли. Publishing определяет семантику публикации и вызывает
-  Media.Contracts для замены регистраций в своей транзакции.
+  Media.Contracts для замены регистраций в своей транзакции. Publishing и
+  Discussions получают актуальный avatar через `IAuthorAvatarReader` в той же
+  транзакции, в которой формируют результат команды. Для итоговой SQL-проекции
+  команд Publishing и Discussions используют Media-owned фрагмент
+  `AuthorAvatarQuery` в Infrastructure. В Core передаётся `AvatarReference?`.
 - **Rationale:** один PostgreSQL позволяет атомарно менять статью и ссылки;
   Garage остаётся внешней границей. Граф Core: Media → Accounts.Contracts;
-  Publishing → Accounts.Contracts + Media.Contracts; ReadModels → существующие
-  контракты + Media.Contracts. Media не обращается обратно к Publishing.
-  Проверка доступности статьи и файла компонуется в ReadModels/API.
+  Publishing → Accounts.Contracts + Media.Contracts; Discussions → Publishing.Contracts,
+  Media.Contracts и существующие контракты; ReadModels → существующие контракты
+  + Media.Contracts. Общий адаптер avatar принимает контекст транзакции
+  вызывающего. Media владеет правилами текущего аватара, ReadModels/API
+  компонуются для проверки доступности статьи и файла.
 - **Alternatives considered:** отдельный Media service требует распределённой
   согласованности; аватар в Accounts с вызовами Media создаёт цикл;
   Media → Publishing для проверки использования также создаёт цикл.
 - **Local evidence:** `src/BlogEngine.Core/Accounts/Domain/LocalUser.cs`,
   `src/BlogEngine.Core/Publishing/Contracts/IPublicationWriteScope.cs`,
+  `src/BlogEngine.Core/Discussions/Contracts/ICommentWriteStore.cs`,
   `tests/BlogEngine.UnitTests/Architecture/DependencyTests.cs`.
 
 ## 2. Закреплённые версии
@@ -53,10 +60,16 @@
   SHA-256 и MD5, затем байты сохраняются в Garage. Скачать можно только
   через Blog: сначала spool объекта и проверка длины/SHA-256, затем повторная
   проверка текущих прав непосредственно перед HTTP-заголовками и потоковая
-  выдача локального файла. Данные целиком в RAM не загружаются.
-  Publication media: `Cache-Control: no-store`; avatar URL содержит версию,
-  но также выдаётся с `no-store` в первом этапе. Старый avatar URL после смены
-  сразу перестаёт разрешаться. Это укладывается в допустимые 60/300 секунд.
+  выдача локального файла. Сбой spool тоже проходит повторную проверку прав
+  до выбора 404 или 503. Данные целиком в RAM не загружаются. У каждой API
+  replica свой эксклюзивный spool volume, на котором при повторном старте
+  временные файлы Media очищаются до readiness и новых transfers.
+  Приёмка с cap 1 GiB RAM совмещает четыре transfers и одну декодировку
+  близко к пределу пикселей, проверяет peak ниже cap, отсутствие OOM
+  и буферизации целого тела.
+  Publication media и avatar выдаются с `Cache-Control: no-store`.
+  Avatar URL содержит fileId текущего назначения. Старый avatar URL после
+  смены сразу перестаёт разрешаться. Это укладывается в допустимые 60/300 секунд.
 - **Rationale:** FR-030 требует обнаруживать повреждение до успешного полного
   ответа; проверка только после отправки 200 недостаточна. Повторная проверка
   после spool исключает устаревшее разрешение при медленном Garage GET.
@@ -112,25 +125,59 @@
   Все внешние записи заранее имеют ObjectRecord и уникальный attempt key.
   Leases с fencing generation запрещают устаревшему worker вернуть файл
   к жизни после expiry/delete. Повторы complete возвращают сохранённый
-  результат, а не выполняют назначение аватара повторно.
+  результат без повторного назначения аватара. Составные FK с purpose/state
+  защищают Ready ссылки публикации/аватара. Ссылки на активные объекты
+  дополнительно закрепляют kind/state, а Ready требует соответствующие
+  representations. Порядок создания и снятия ссылок сохраняет эти условия
+  при каждом SQL-переходе. Цели FK с изменяемым File/Object state используют
+  непарциальные UNIQUE indexes PostgreSQL и миграционные FK. EF Core
+  отслеживает state как обычное изменяемое свойство, поскольку alternate keys
+  доступны только для чтения.
 - **Rationale:** общий commit PostgreSQL+S3 отсутствует; tracked objects и
   persistent cleanup позволяют восстановиться в каждой точке обрыва.
+  PostgreSQL отклоняет неправильный owner/purpose или незавершённый объект
+  даже при ошибке адаптера. Для отслеживания позднего PUT worker продолжает
+  reconciliation после первого успешного удаления. Начальный диапазон
+  включает 10 000 сохранённых записей, 1 000 новых retirements за 24 часа,
+  1 000 ожидающих expired uploads на старте/восстановлении и 1 000 новых
+  expiries за 24 часа, включая загрузки без объектов. Три независимых
+  пакета до 100 due object jobs, 100 expired uploads и 100 reconciliation
+  rows каждые 5 минут проверяются при полном обходе до 12 часов и drain
+  после восстановления за 24 часа. Late PUT после DeleteObject в течение
+  первого часа от retirement/восстановления проверяется по исходному сроку.
 - **Alternatives considered:** держать DB lock во время S3, безусловно
   перезаписывать один ключ или удалять сироты только bucket listing — ненадёжно.
+- **Sources:** [цели FK PostgreSQL](https://www.postgresql.org/docs/18/ddl-constraints.html#DDL-CONSTRAINTS-FK),
+  [ключи EF Core](https://learn.microsoft.com/en-us/ef/core/modeling/keys#alternate-keys).
 
 ## 7. Квоты, гонки и HTTP-совместимость
 
 - **Decision:** owner allowance row сериализует reserve/ready/delete/avatar
   и изменение registrations. Expired reserves исключаются по DB time даже
-  до worker cleanup. Порядок блокировок: publication (если нужна) → allowance
-  ownerId → avatar state → files по UUID → uploads/jobs. X-Resource-Version
-  остаётся UUID; пустой avatar state также имеет постоянную версию.
+  до worker cleanup. Проверка текущих прав нового обычного upload перехода,
+  claim/replay обычного PUT и publication write использует Accounts advisory xact lock
+  на actor. Accounts guard читает локальные роли под тем же ключом, что
+  grant/revoke, отдельным запросом после lock в транзакции READ COMMITTED.
+  Этот lock берётся первым, затем
+  publication при наличии → allowance ownerId → avatar state → files по UUID →
+  uploads/jobs. Повторы неизменного результата не создают нового перехода.
+  X-Resource-Version остаётся UUID; пустой avatar state имеет постоянную версию.
   Командный результат создаётся в своей транзакции, без дочитывания после commit.
   Составные новые чтения используют один SQL snapshot либо короткий read-only
   REPEATABLE READ; один batch авторов на ограниченный набор результатов.
 - **Rationale:** существующие F01/F05/F08 затрагивают новые пути. Для binary
   endpoints нужна отдельная политика middleware/Accept/body limits, поскольку
   текущий RequestContractValidation буферизует JSON и ограничивает его 8 MiB.
+  API ceiling определяется назначением файла. Его отказ при первом PUT
+  завершает попытку через lifecycle. Собственный отказ upstream proxy
+  оставляет состояние попытки прежним. Replay принятых bytes защищает
+  staging object и резерв при конфликте и превышении лимита.
+  Использование Accounts lock упорядочивает revoke и Ready commit даже при
+  отдельных процессах API и Operator. Обычный PUT проверяет Author/Admin до
+  upload lock и чтения тела. Разрешённый claim может сохранить staging после
+  revoke, а последующие complete/Ready проверяют текущие права заново.
+  Worker проверяет локальный actor ID без сетевого вызова.
+- **Local evidence:** `src/BlogEngine.Infrastructure/Persistence/Accounts/RoleAdministrationStore.cs`.
 - **Alternatives considered:** глобально повысить JSON limit, прибавлять резерв
   без блокировки или считать только физически очищенные uploads — некорректно.
   Строгие старые схемы additionalProperties:false требуют явного согласованного
@@ -150,6 +197,10 @@
   остановить workers, дренировать in-flight, проверить здоровый синхронный
   кластер; pg_dump; остановить все Garage nodes; скопировать все data/metadata
   volumes, конфигурацию/layout и защищённые ключи в один recovery set.
+  При rollout старые writers блокируются и останавливаются после drain
+  перед развёртыванием совместимого API с разрешённой записью. Проверка ingress,
+  прямых write-доступов и отсутствия активных legacy запросов предшествует
+  любому smoke, создающему managed link.
 - **Rationale:** после quiesce состояние не меняется и SQL/объекты относятся
   к одной логической точке. Garage snapshots одной metadata DB не заменяют
   согласованную копию Blog+объектов. Подробный runbook — в contracts/operations.md.

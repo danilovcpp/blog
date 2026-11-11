@@ -4,7 +4,8 @@ info:
   version: 1.1.0-design
   description: Planning artifact, not current runtime capability. Merge into the historical MVP baseline as
     documented in http-api.md. All old operations retained; same-name schemas replaced wholesale. All new responses
-    no-store; all errors ProblemDetails. Unknown JSON fields rejected. No cookies or browser-to-Garage access.
+    no-store. Errors produced by the API use ProblemDetails. Unknown JSON fields rejected. No cookies or
+    browser-to-Garage access.
 x-contract-mode: feature-delta
 x-baseline: ../../001-blog-engine-mvp/contracts/openapi.yaml
 x-merge-rule: 'Copy baseline; merge paths by path+method and ALL component sections including responses and
@@ -176,11 +177,21 @@ paths:
     put:
       operationId: putMediaUploadContent
       summary: Upload exact bytes through Blog
-      description: Bounded disk spool; enforce actual purpose limit and exact declaredSize, including chunked
-        requests. Different bytes after acceptance409 content_conflict; active transfer409 upload_in_progress;
-        Processing/Completed replacement409 invalid_state. Transport MIME must be octet-stream. No whole-body
-        RAM buffering. Actual-size mismatch or limit violation is terminal Rejected and releases quota immediately;
-        an interrupted transfer remains retryable.
+      description: >-
+        Check ownership, effective expiry and state before reading the octet-stream body. An active transfer gives
+        409 upload_in_progress. Processing and terminal states, including effective Expired, give 409 invalid_state.
+        Active ordinary uploads require the current Author or Admin role for a new PUT claim or replay. Role
+        denial gives 403 without a state or quota change. A claim admitted before revocation may stage bytes;
+        complete and the Ready transition recheck local roles.
+        The API body ceiling is set by purpose (50/10/5 MiB), independent of declaredSize, including chunked bodies.
+        For a new fenced transfer in AwaitingContent, exceeding the ceiling gives 413 request_too_large and a
+        complete body within the ceiling with a mismatched declaredSize gives 400 validation_failed. Both reject
+        the upload and release the reservation atomically. An interrupted or failed body read remains retryable
+        unless a size violation has already been established. In ContentReceived, identical length and SHA-256
+        give 204, different length or hash within the ceiling gives 409 content_conflict, and exceeding the ceiling
+        gives 413 request_too_large. All three outcomes preserve the accepted bytes, state and reservation.
+        A proxy or transport rejection before the API sees the request leaves the upload unchanged and may use
+        a different response format. Read the existing upload with GET, then retry or cancel it as appropriate.
       responses:
         '204':
           description: Bytes staged, or exact same length and SHA-256 replay.
@@ -287,8 +298,10 @@ paths:
     get:
       operationId: listMediaFiles
       summary: List ready library files
-      description: Own prior files remain readable after Author revocation. Admin may select ownerId. No avatar
-        files. Beyond-end page empty.
+      description: >-
+        Own prior files remain readable after Author revocation. Admin may select ownerId. Returns Attachment
+        and PublicationImage only. Each request pages the current sorted set. Empty and beyond-end pages return
+        empty items and hasNextPage=false. Inserts or removals between requests can shift page membership.
       responses:
         '200':
           description: Ready Attachment and PublicationImage, createdAt DESC,id DESC.
@@ -329,9 +342,11 @@ paths:
         required: false
         schema:
           type: integer
+          format: int32
           minimum: 1
+          maximum: 2147483647
           default: 1
-        description: ''
+        description: One-based page number. An invalid value gives 400 validation_failed.
       - name: pageSize
         in: query
         required: false
@@ -340,7 +355,7 @@ paths:
           minimum: 1
           maximum: 100
           default: 20
-        description: ''
+        description: Maximum items per page. An invalid value gives 400 validation_failed.
       x-request-body: must be absent
   /api/v1/media/allowance:
     get:
@@ -395,7 +410,7 @@ paths:
     get:
       operationId: getMediaFile
       summary: Read own or Admin ready file metadata
-      description: Read own or Admin ready file metadata
+      description: Read Ready Attachment or PublicationImage metadata as owner or Admin. Avatar IDs return 404.
       responses:
         '200':
           description: Authorized Ready file metadata.
@@ -426,9 +441,12 @@ paths:
       x-request-body: must be absent
     delete:
       operationId: deleteMediaFile
-      summary: Logically delete an unused file
-      description: Any current registration409 file_in_use. Availability and quota change in commit; physical
-        cleanup async. Tombstone preserves authorized repeated DELETE; strangers404.
+      summary: Logically delete an unused Attachment or PublicationImage
+      description: >-
+        A current publication link gives 409 file_in_use. Availability and quota change in the same commit.
+        Physical cleanup is asynchronous. A tombstone for Attachment or PublicationImage supports repeat DELETE
+        by the owner or Admin. Avatar IDs, including tombstones, return 404 to every caller. Delete a current
+        own avatar with the versioned DELETE /me/avatar operation.
       responses:
         '204':
           description: Logically deleted, or authorized owner/Admin repeat.
@@ -467,10 +485,12 @@ paths:
     get:
       operationId: downloadPrivateMediaFile
       summary: Download authorized private original or display
-      description: Owner/Admin only. Attachment supports original, PublicationImage supports original/display.
-        Original forced octet-stream attachment; display PNG. No avatar source route. Missing variant returns404.
-        Check current authorization again after spool and integrity verification; unavailable/corrupt authorized
-        object503. Range ignored with full200; no304.
+      description: >-
+        Owner or Admin only. Attachment supports original and PublicationImage supports original or display.
+        Original is served as an octet-stream attachment and display as PNG. An unavailable variant or Avatar ID
+        returns 404. Recheck current access after the object read attempt before both binary success and a
+        classified storage, spool or integrity error. If the file was deleted or access changed, return 404.
+        A read failure for a still-authorized object gives 503 dependency_unavailable. Range is ignored.
       responses:
         '200':
           description: Original bytes or cleaned PNG as selected; verified length/SHA-256 before headers.
@@ -548,10 +568,13 @@ paths:
     get:
       operationId: downloadPublicationMedia
       summary: Read media through its current publication link
-      description: Current published article and exact link required for guests/readers. Owner/Admin may access
-        Draft. Original variant never accepted. Reauthorize after verified spool before headers; constant URL
-        grants no access. No new read after unpublish/link deletion; already-started response may finish. No
-        view count increment, no other file usages disclosed. No-store, no304, Range ignored.
+      description: >-
+        Guests and readers need a currently published article and the exact link. Owner or Admin may access
+        a draft. The route serves attachment and display. Recheck current publication access, the link and
+        file readiness after the object read attempt before binary success or a classified storage, spool or
+        integrity error. Revoked access gives 404, including after unpublish, deletion or link removal. A read
+        failure for a still-authorized object gives 503 dependency_unavailable. A response already started may
+        finish. No view count increment or disclosure of other file usages. No-store, no 304, Range ignored.
       responses:
         '200':
           description: Attachment bytes as octet-stream attachment, or cleaned PNG image as selected.
@@ -711,9 +734,11 @@ paths:
     get:
       operationId: getPublicAvatarImage
       summary: Read a currently assigned avatar rendition
-      description: Only current assignment is publicly readable; old fileId404 immediately after replacement/deletion.
-        No-store; no304; Range ignored. Original never exposed. Avatar cache allowance300s is not used by this
-        first-stage no-store implementation.
+      description: >-
+        The public URL serves a rendition of the current assignment. Recheck the assignment after the object
+        read attempt before binary success or a classified storage, spool or integrity error. Replacement or
+        deletion gives 404 for the old fileId immediately after commit. A read failure for a still-current
+        assignment gives 503 dependency_unavailable. No-store, no 304, Range ignored.
       responses:
         '200':
           description: Newly encoded metadata-free square PNG.
@@ -914,9 +939,10 @@ components:
           - Avatar
         name:
           type: string
-          minLength: 1
-          maxLength: 255
-          description: After trim, Unicode scalar count; reject paths, separators and controls.
+          description: >-
+            Reject Unicode Cc, U+002F and U+005C in the input. Strip surrounding Unicode White_Space, then
+            require 1 to 255 Unicode scalars. Reject dot, dot-dot and an ASCII letter followed by a colon
+            at the start of the normalized name. This is the display and download name.
         declaredSize:
           type: integer
           format: int64
@@ -1307,7 +1333,8 @@ components:
         omission preserves media links; explicit null coverFileId or empty arrays clears. On create omitted
         media defaults empty. Legacy omitted description/coverUrl clears external values. Exact echo of current
         managed coverUrl preserves it when coverFileId omitted; other internal URLs cannot become external
-        covers. Non-null coverFileId plus external non-null coverUrl is400. See http-api.md.
+        covers. Non-null coverFileId plus external non-null coverUrl is400. Within-role repeats are invalid.
+        One PublicationImage may be both Cover and Inline, counted once per role. See http-api.md.
     PublicationCard:
       type: object
       additionalProperties: false
@@ -1609,6 +1636,9 @@ components:
     WorkspacePublication:
       type: object
       additionalProperties: false
+      description: >-
+        Workspace representation with the author's current nullable avatar. Successful create, edit, publish
+        and unpublish responses use the command transaction's snapshot for both publication and author avatar.
       properties:
         id:
           type: string
