@@ -30,7 +30,7 @@ public static class MediaLibraryEndpoints
         app.MapDelete("/api/v1/media/files/{id}", async (Guid id, CurrentActorAccessor actors, FileDeletion service, CancellationToken ct) =>
         {
             await service.DeleteAsync(await actors.GetRequiredAsync(ct), id, ct);
-            return Results.NoContent();
+            return TypedResults.NoContent();
         }).WithName("deleteMediaFile");
 
         app.MapGet("/api/v1/media/files/{id}/content", async (Guid id, HttpContext context, CurrentActorAccessor actors, MediaLibrary service, PublicationImageQuery images, MediaBinaryTransport binary, CancellationToken ct) =>

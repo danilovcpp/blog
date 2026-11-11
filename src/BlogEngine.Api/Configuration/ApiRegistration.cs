@@ -107,6 +107,7 @@ public static class ApiRegistration
             services.AddOpenApi(options =>
             {
                 options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
+                options.AddOperationTransformer(OpenApiContract.DescribeBinaryAsync);
                 options.AddDocumentTransformer(OpenApiContract.TransformAsync);
             });
         }

@@ -1,6 +1,6 @@
 /**
  * Blog Engine API 1.0.0. Wire DTOs, not runtime validators.
- * Source: specs/001-blog-engine-mvp/contracts/openapi.yaml.
+ * Source: openapi-v1.yaml.
  * See frontend-api-spec.md for authorization, validation and transitions.
  * Int64 is a JSON number on the wire; use a lossless parser if full precision is needed.
  */
@@ -45,11 +45,101 @@ export interface ModerationQuery extends PageQuery {
 
 export interface AuthorRef {
   id: UUID;
+  avatar: AvatarRef | null;
 }
 
 export interface Me {
   id: UUID;
   roles: LocalRole[];
+  avatar: AvatarRef | null;
+  avatarVersion: UUID;
+}
+
+export interface AvatarRef {
+  fileId: UUID;
+  smallUrl: string;
+  largeUrl: string;
+}
+
+export interface AvatarState {
+  fileId: UUID | null;
+  version: UUID;
+  avatar: AvatarRef | null;
+}
+
+export type MediaPurpose = "Attachment" | "PublicationImage" | "Avatar";
+export type UploadState =
+  | "AwaitingContent"
+  | "ContentReceived"
+  | "Processing"
+  | "Completed"
+  | "Rejected"
+  | "Cancelled"
+  | "Expired";
+
+export interface UploadCreate {
+  purpose: MediaPurpose;
+  name: string;
+  declaredSize: Int64;
+  declaredContentType: string;
+}
+
+export interface UploadResult {
+  uploadId: UUID;
+  fileId: UUID;
+  purpose: MediaPurpose;
+  completedAt: UtcDateTime;
+  appliedAvatarVersion: UUID | null;
+}
+
+export interface Upload extends UploadCreate {
+  id: UUID;
+  fileId: UUID;
+  createdAt: UtcDateTime;
+  expiresAt: UtcDateTime;
+  state: UploadState;
+  result: UploadResult | null;
+  errorCode: string | null;
+}
+
+export interface Allowance {
+  limit: Int64;
+  used: Int64;
+  reserved: Int64;
+  available: Int64;
+}
+
+export interface FileMetadata {
+  id: UUID;
+  ownerId: UUID;
+  purpose: "Attachment" | "PublicationImage";
+  name: string;
+  size: Int64;
+  contentType: string;
+  createdAt: UtcDateTime;
+  state: "Ready";
+  originalUrl: string | null;
+  displayUrl: string | null;
+}
+
+export type FilePage = Page<FileMetadata>;
+
+export interface FileQuery extends PageQuery {
+  ownerId?: UUID;
+}
+
+export interface PublicationImageRef {
+  fileId: UUID;
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface PublicationAttachmentRef {
+  fileId: UUID;
+  name: string;
+  size: Int64;
+  url: string;
 }
 
 export interface Taxonomy {
@@ -80,6 +170,7 @@ export interface PublicationCard extends Counters {
   slug: string;
   description: string | null;
   coverUrl: string | null;
+  coverFileId: UUID | null;
   author: AuthorRef;
   createdAt: UtcDateTime;
   updatedAt: UtcDateTime;
@@ -90,6 +181,8 @@ export interface PublicationCard extends Counters {
 
 export interface Publication extends PublicationCard {
   markdown: string;
+  inlineImages: PublicationImageRef[];
+  attachments: PublicationAttachmentRef[];
 }
 
 export interface WorkspaceCard extends Omit<PublicationCard, "firstPublishedAt"> {
@@ -100,6 +193,10 @@ export interface WorkspaceCard extends Omit<PublicationCard, "firstPublishedAt">
 
 export interface WorkspacePublication extends WorkspaceCard {
   markdown: string;
+  inlineImages: PublicationImageRef[];
+  attachments: PublicationAttachmentRef[];
+  inlineImageIds: UUID[];
+  attachmentIds: UUID[];
 }
 
 export interface PublicationWrite {
@@ -110,6 +207,9 @@ export interface PublicationWrite {
   tagIds: UUID[];
   description?: string | null;
   coverUrl?: string | null;
+  coverFileId?: UUID | null;
+  inlineImageIds?: UUID[];
+  attachmentIds?: UUID[];
 }
 
 export interface CommentCreate {
@@ -194,7 +294,12 @@ export type ProblemCode =
   | "not_acceptable"
   | "internal_error"
   | "dependency_unavailable"
-  | "identity_keys_unavailable";
+  | "identity_keys_unavailable"
+  | "quota_exceeded"
+  | "idempotency_conflict"
+  | "content_conflict"
+  | "upload_in_progress"
+  | "file_in_use";
 
 export interface Problem {
   type: string;

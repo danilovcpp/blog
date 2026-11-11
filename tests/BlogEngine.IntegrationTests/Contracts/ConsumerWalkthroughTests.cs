@@ -1,10 +1,14 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using BlogEngine.Core.Accounts.Contracts;
+using BlogEngine.Core.Media.Application;
 using BlogEngine.IntegrationTests.Fixtures;
 using BlogEngine.IntegrationTests.Http;
+using BlogEngine.IntegrationTests.Media;
+using Microsoft.Extensions.DependencyInjection;
 using static BlogEngine.IntegrationTests.Fixtures.PublishingFixture;
 
 namespace BlogEngine.IntegrationTests.Contracts;
@@ -12,6 +16,128 @@ namespace BlogEngine.IntegrationTests.Contracts;
 [Trait("Category", "ConsumerContract")]
 public sealed class ConsumerWalkthroughTests(PostgresFixture postgres, GarageFixture garage) : IClassFixture<PostgresFixture>, IClassFixture<GarageFixture>
 {
+    [Fact]
+    public async Task MediaConsumerUsesOnlyContractUrlsAndLegacyWritesPreserveAttachments()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var contract = await OpenApiCompatibilityTests.ContractAsync(ct);
+        await using var fixture = await StartAsync(postgres, ct, mediaStorage: garage);
+        var author = await fixture.ActorAsync(LocalRole.Author, ct);
+        var reader = await fixture.ActorAsync(LocalRole.Reader, ct);
+        var operations = contract["paths"]!.AsObject().SelectMany(path =>
+            path.Value!.AsObject().Where(pair => OpenApiCompatibilityTests.IsMethod(pair.Key))
+                .Select(pair => (Path: path.Key, Method: pair.Key, Operation: pair.Value!)))
+            .ToDictionary(endpoint => endpoint.Operation["operationId"]!.GetValue<string>());
+        var covered = new HashSet<string>();
+
+        async Task<JsonNode?> Call(HttpClient client, string name, HttpStatusCode status,
+            string? url = null, HttpContent? body = null, Guid? version = null, byte[]? expectedBytes = null)
+        {
+            var endpoint = operations[name];
+            using var request = new HttpRequestMessage(new HttpMethod(endpoint.Method), url ?? endpoint.Path) { Content = body };
+            if (name == "createMediaUpload") { request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D")); }
+            if (version is { } expectedVersion) { request.Headers.Add("X-Resource-Version", expectedVersion.ToString("D")); }
+            using var response = await client.SendAsync(request, ct);
+            Assert.Equal(status, response.StatusCode);
+            Assert.True(response.Headers.CacheControl?.NoStore, name);
+            covered.Add(name);
+            var definition = OpenApiCompatibilityTests.Resolve(contract, endpoint.Operation["responses"]![((int)status).ToString(System.Globalization.CultureInfo.InvariantCulture)]!);
+            var mediaType = response.Content.Headers.ContentType?.MediaType;
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            if (status == HttpStatusCode.NoContent)
+            {
+                Assert.Empty(bytes);
+                Assert.Null(definition["content"]);
+                return null;
+            }
+            Assert.NotNull(mediaType);
+            var schema = definition["content"]?[mediaType]?["schema"];
+            Assert.NotNull(schema);
+            if (schema["format"]?.ToString() == "binary")
+            {
+                Assert.Equal(bytes.LongLength, response.Content.Headers.ContentLength);
+                Assert.Contains("nosniff", response.Headers.GetValues("X-Content-Type-Options"));
+                Assert.NotNull(response.Content.Headers.ContentDisposition);
+                if (expectedBytes is not null) { Assert.Equal(expectedBytes, bytes); }
+                else { Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, bytes[..8]); }
+                return null;
+            }
+            var json = JsonNode.Parse(bytes);
+            Validate(contract, schema, json, name);
+            return json;
+        }
+
+        Task<JsonNode?> Initialize(HttpClient client, string purpose, string type, byte[] bytes, Guid? version = null) =>
+            Call(client, "createMediaUpload", HttpStatusCode.Created,
+                body: JsonContent.Create(new { purpose, name = "walkthrough.bin", declaredSize = bytes.Length, declaredContentType = type }), version: version);
+
+        async Task<Guid> Upload(HttpClient client, string purpose, string type, byte[] bytes, Guid? version = null)
+        {
+            var upload = (await Initialize(client, purpose, type, bytes, version))!;
+            var url = $"/api/v1/media/uploads/{upload["id"]}";
+            using var body = new ByteArrayContent(bytes);
+            body.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            await Call(client, "putMediaUploadContent", HttpStatusCode.NoContent, url + "/content", body);
+            await Call(client, "completeMediaUpload", HttpStatusCode.Accepted, url + "/complete");
+            using (var scope = fixture.Factory.Services.CreateScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<UploadCompletion>().ProcessAsync(upload["id"]!.GetValue<Guid>(), ct);
+            }
+            var completed = (await Call(client, "getMediaUpload", HttpStatusCode.OK, url))!;
+            Assert.Equal("Completed", completed["state"]!.ToString());
+            var replay = await Call(client, "completeMediaUpload", HttpStatusCode.OK, url + "/complete");
+            Assert.True(JsonNode.DeepEquals(completed["result"], replay));
+            return completed["fileId"]!.GetValue<Guid>();
+        }
+
+        var bytes = "consumer attachment"u8.ToArray();
+        var pending = (await Initialize(author, "Attachment", "text/plain", bytes))!;
+        await Call(author, "cancelMediaUpload", HttpStatusCode.NoContent, $"/api/v1/media/uploads/{pending["id"]}");
+        var fileId = await Upload(author, "Attachment", "text/plain", bytes);
+        var fileUrl = $"/api/v1/media/files/{fileId:D}";
+        await Call(author, "getMediaAllowance", HttpStatusCode.OK);
+        await Call(author, "listMediaFiles", HttpStatusCode.OK);
+        await Call(author, "getMediaFile", HttpStatusCode.OK, fileUrl);
+        await Call(author, "downloadPrivateMediaFile", HttpStatusCode.OK, fileUrl + "/content", expectedBytes: bytes);
+        await Call(reader, "getMediaFile", HttpStatusCode.NotFound, fileUrl);
+
+        var draft = (await Call(author, "createPublication", HttpStatusCode.Created, body: JsonContent.Create(new
+        {
+            title = "Media walkthrough",
+            slug = "media-walkthrough",
+            markdown = "Draft",
+            categoryIds = Array.Empty<Guid>(),
+            tagIds = Array.Empty<Guid>(),
+            attachmentIds = new[] { fileId },
+        })))!;
+        var publicationUrl = $"/api/v1/publications/{draft["id"]}";
+        var edit = (await Call(author, "updatePublication", HttpStatusCode.OK, publicationUrl,
+            JsonContent.Create(Content("media-walkthrough", "Legacy edit", [], [])), draft["version"]!.GetValue<Guid>()))!;
+        Assert.Equal(fileId, Assert.Single(edit["attachments"]!.AsArray())!["fileId"]!.GetValue<Guid>());
+        var published = (await Call(author, "publishPublication", HttpStatusCode.OK, publicationUrl + "/publish", version: edit["version"]!.GetValue<Guid>()))!;
+        var publicDetail = (await Call(fixture.Anonymous, "getPublication", HttpStatusCode.OK, publicationUrl))!;
+        var attachment = Assert.Single(publicDetail["attachments"]!.AsArray())!;
+        await Call(fixture.Anonymous, "downloadPublicationMedia", HttpStatusCode.OK, attachment["url"]!.ToString(), expectedBytes: bytes);
+        var unpublished = (await Call(author, "unpublishPublication", HttpStatusCode.OK, publicationUrl + "/unpublish", version: published["version"]!.GetValue<Guid>()))!;
+        await Call(author, "deletePublication", HttpStatusCode.NoContent, publicationUrl, version: unpublished["version"]!.GetValue<Guid>());
+        await Call(author, "deleteMediaFile", HttpStatusCode.NoContent, fileUrl);
+
+        var empty = (await Call(reader, "getOwnAvatarState", HttpStatusCode.OK))!;
+        Assert.Null(empty["avatar"]);
+        var png = PublicationMediaReadTests.Image();
+        var avatarId = await Upload(reader, "Avatar", "image/png", png, empty["version"]!.GetValue<Guid>());
+        var me = (await Call(reader, "getMe", HttpStatusCode.OK))!;
+        var avatar = me["avatar"]!;
+        Assert.Equal(avatarId, avatar["fileId"]!.GetValue<Guid>());
+        await Call(fixture.Anonymous, "getPublicAvatarImage", HttpStatusCode.OK, avatar["smallUrl"]!.ToString());
+        await Call(fixture.Anonymous, "getPublicAvatarImage", HttpStatusCode.OK, avatar["largeUrl"]!.ToString());
+        var cleared = await Call(reader, "deleteOwnAvatar", HttpStatusCode.OK, version: me["avatarVersion"]!.GetValue<Guid>());
+        Assert.Null(cleared!["avatar"]);
+        Assert.Equal(14, covered.Count(name => name.Contains("Media", StringComparison.Ordinal) || name.Contains("Avatar", StringComparison.Ordinal)));
+        await File.WriteAllTextAsync(ArtifactPath("media/consumer-walkthrough.json"),
+            JsonSerializer.Serialize(new { status = "passed", operations = covered.Order().ToArray() }), ct);
+    }
+
     [Fact]
     public async Task DocumentedConsumerCompletesAllSevenStoriesAndReceivesOnlyPermittedFields()
     {
@@ -115,7 +241,10 @@ public sealed class ConsumerWalkthroughTests(PostgresFixture postgres, GarageFix
             Assert.Contains(actualType, types);
         }
         if (schema["enum"] is JsonArray allowed) { Assert.Contains(allowed, v => JsonNode.DeepEquals(v, value)); }
-        if (schema["const"] is { } constant) { Assert.True(JsonNode.DeepEquals(constant, value), path + " const"); }
+        if (schema["const"] is { } constant)
+        {
+            Assert.True(JsonNode.DeepEquals(constant, value), $"{path}: expected {constant.ToJsonString()}, received {value?.ToJsonString()}");
+        }
         if (value is JsonValue scalar && scalar.GetValueKind() == JsonValueKind.String)
         {
             var text = scalar.GetValue<string>(); var length = text.EnumerateRunes().Count();

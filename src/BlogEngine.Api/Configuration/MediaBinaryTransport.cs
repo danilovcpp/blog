@@ -12,6 +12,8 @@ public sealed record MediaDownloadAccess(MediaBucketKind Bucket, string Key, lon
 
 public sealed class MediaBinaryTransport(IMediaObjectStorage storage, IMediaSpool spool)
 {
+    public const string UploadContentType = "application/octet-stream";
+
     // Invoke only after the upload owner/state/role claim has succeeded, before any body read.
     // In particular, 413 from Kestrel remains visible to the fenced upload scenario.
     public static void PrepareUpload(HttpContext context, MediaPurpose purpose)
@@ -20,7 +22,7 @@ public sealed class MediaBinaryTransport(IMediaObjectStorage storage, IMediaSpoo
         if (feature?.IsReadOnly == true) { throw new InvalidOperationException("Upload body was read before authorization."); }
         if (feature is not null) { feature.MaxRequestBodySize = MediaRules.MaximumSize(purpose); }
         if (!MediaTypeHeaderValue.TryParse(context.Request.ContentType, out var type) ||
-            !type.MediaType.Equals("application/octet-stream", StringComparison.OrdinalIgnoreCase) || type.Parameters.Count != 0)
+            !type.MediaType.Equals(UploadContentType, StringComparison.OrdinalIgnoreCase) || type.Parameters.Count != 0)
         { throw new DomainError("unsupported_media_type"); }
     }
 

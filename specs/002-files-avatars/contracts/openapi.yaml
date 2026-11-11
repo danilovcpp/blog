@@ -997,7 +997,8 @@ components:
         limit:
           type: integer
           format: int64
-          const: 1073741824
+          minimum: 1073741824
+          maximum: 1073741824
         used:
           type: integer
           format: int64

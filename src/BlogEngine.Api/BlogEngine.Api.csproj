@@ -12,8 +12,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="../../specs/001-blog-engine-mvp/contracts/openapi.yaml" LogicalName="BlogEngine.Api.openapi.yaml" />
-    <EmbeddedResource Include="../../specs/002-files-avatars/contracts/openapi-us4.yaml" LogicalName="BlogEngine.Api.media-us4.yaml" />
+    <EmbeddedResource Include="../../docs/api/openapi-v1.yaml" LogicalName="BlogEngine.Api.openapi-v1.yaml" />
     <Folder Include="Endpoints/" />
     <Folder Include="Contracts/" />
     <Folder Include="Configuration/" />

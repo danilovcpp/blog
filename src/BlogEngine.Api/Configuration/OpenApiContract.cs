@@ -8,24 +8,45 @@ namespace BlogEngine.Api.Configuration;
 // applying descriptions, response unions and constraints that cannot be inferred from handlers.
 public static class OpenApiContract
 {
+    public static Task DescribeBinaryAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken ct)
+    {
+        var binary = context.Description.ActionDescriptor.EndpointMetadata.OfType<BinaryEndpoint>().SingleOrDefault();
+        if (binary is null) { return Task.CompletedTask; }
+
+        if (binary.RawUpload)
+        {
+            // The handler reads the body after the ownership check. Accepts metadata would
+            // allow routing to reject the content type before that check.
+            operation.RequestBody = new OpenApiRequestBody
+            {
+                Required = true,
+                Content = BinaryContent(MediaBinaryTransport.UploadContentType),
+            };
+        }
+        else
+        {
+            var content = BinaryContent(binary.ContentType);
+            if (binary.AlternateContentType is { } alternate) { content.Add(alternate, BinaryMediaType()); }
+            operation.Responses!["200"] = new OpenApiResponse { Description = "OK", Content = content };
+        }
+        return Task.CompletedTask;
+    }
+
+    private static Dictionary<string, OpenApiMediaType> BinaryContent(string type) =>
+        new(StringComparer.Ordinal) { [type] = BinaryMediaType() };
+
+    private static OpenApiMediaType BinaryMediaType() =>
+        new() { Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary" } };
+
     public static async Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken ct)
     {
-        await using var stream = typeof(OpenApiContract).Assembly.GetManifestResourceStream("BlogEngine.Api.openapi.yaml")
+        await using var stream = typeof(OpenApiContract).Assembly.GetManifestResourceStream("BlogEngine.Api.openapi-v1.yaml")
             ?? throw new InvalidOperationException("The normative API contract is missing.");
         var settings = new OpenApiReaderSettings(); settings.AddYamlReader();
         var result = await OpenApiDocument.LoadAsync(stream, "yaml", settings, ct);
         if (result.Diagnostic?.Errors.Count > 0 || result.Document is null)
         { throw new InvalidOperationException("The normative API contract is invalid."); }
         var contract = result.Document;
-        // The final consumer aggregate remains a separate phase; this slice matches the implemented routes.
-        await using var mediaStream = typeof(OpenApiContract).Assembly.GetManifestResourceStream("BlogEngine.Api.media-us4.yaml")
-            ?? throw new InvalidOperationException("The Media US1/US2/US3/US4 contract is missing.");
-        var media = await OpenApiDocument.LoadAsync(mediaStream, "yaml", settings, ct);
-        if (media.Diagnostic?.Errors.Count > 0 || media.Document is null) { throw new InvalidOperationException("The Media US1/US2/US3/US4 contract is invalid."); }
-        foreach (var (path, item) in media.Document.Paths) { contract.Paths.Add(path, item); }
-        foreach (var (name, schema) in media.Document.Components!.Schemas!)
-        { contract.Components!.Schemas![name] = schema; }
-        foreach (var (name, response) in media.Document.Components.Responses!) { contract.Components!.Responses!.Add(name, response); }
         var runtime = document.Paths.Where(p => p.Key.StartsWith("/api/", StringComparison.Ordinal) || p.Key.StartsWith("/health/", StringComparison.Ordinal))
             .SelectMany(p => p.Value.Operations!.Select(o => (Path: p.Key, Method: o.Key, Operation: o.Value)))
             .ToDictionary(o => o.Operation.OperationId ?? throw new InvalidOperationException("An API operation has no stable name."));
@@ -53,5 +74,6 @@ public static class OpenApiContract
         document.Servers = contract.Servers;
         document.Security = contract.Security;
         document.Components = contract.Components;
+        document.Extensions = contract.Extensions;
     }
 }

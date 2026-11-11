@@ -21,6 +21,13 @@ internal sealed class PublishingFixture : IAsyncDisposable
             Directory.CreateDirectory(destination);
             return Path.Combine(destination, name[mediaPrefix.Length..]);
         }
+        const string migrationPrefix = "migrations/";
+        if (name.StartsWith(migrationPrefix, StringComparison.Ordinal) &&
+            Environment.GetEnvironmentVariable("BLOG_MIGRATION_VALIDATION_DIRECTORY") is { Length: > 0 } migrationDestination)
+        {
+            Directory.CreateDirectory(migrationDestination);
+            return Path.Combine(migrationDestination, name[migrationPrefix.Length..]);
+        }
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(directory.FullName, "BlogEngine.slnx")))
         { directory = directory.Parent ?? throw new InvalidOperationException("Repository root was not found."); }

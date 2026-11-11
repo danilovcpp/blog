@@ -37,7 +37,8 @@ TLS завершается на доверенном ingress. Ограничьт
 настройте body envelope не меньше контрактных 8 MiB с безопасным 413 на внешней
 границе. `/health/live` — process liveness, `/health/ready` — PostgreSQL/JWKS/Media readiness;
 readiness доступен внутренней сети. В Production OpenAPI/Swagger выключены.
-Документация потребителя: нормативные openapi.yaml и operations.md.
+Нормативный контракт — [OpenAPI v1](../api/openapi-v1.yaml).
+Для клиентов со строгой валидацией действует [порядок перехода](../api/media-v1-transition.md).
 
 ## Отдельный миграционный шаг и rollout
 

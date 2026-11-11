@@ -1,7 +1,7 @@
 # Blog Engine: спецификация API для проектирования frontend
 
 Версия API: **1.0.0**, префикс **`/api/v1`**, OpenAPI **3.1.0**.
-Документ подготовлен **27 октября 2026 года** по текущим файлам рабочего дерева.
+Документ обновлён **12 ноября 2026 года** для файлов и аватаров.
 Адрес конкретной установки не задан. Все UUID, даты, адреса и токены в примерах
 иллюстративные; использовать их как конфигурацию среды нельзя.
 
@@ -12,7 +12,9 @@ HTTP-контракты, модели, ограничения, права, пе�
 
 Нормативные источники:
 
-- [OpenAPI — все 35 операций и JSON Schema](../../specs/001-blog-engine-mvp/contracts/openapi.yaml).
+- [OpenAPI — все 49 операций и JSON Schema](openapi-v1.yaml).
+- [HTTP-контракт Media и матрица доступа](../../specs/002-files-avatars/contracts/http-api.md).
+- [Переход потребителей v1](media-v1-transition.md).
 - [Дополнение: безопасность, видимость, версии и эксплуатация](../../specs/001-blog-engine-mvp/contracts/operations.md).
 - [Функциональная спецификация](../../specs/001-blog-engine-mvp/spec.md).
 - [Реализация HTTP endpoints](../../src/BlogEngine.Api/Endpoints).
@@ -48,7 +50,8 @@ OpenAPI определяет форму обмена. Этот документ 
 21. [Контрольный список приёмки](#21-контрольный-список-приёмки).
 22. [Настройки и вопросы для интеграции](#22-настройки-и-вопросы-для-интеграции).
 23. [Приложение: граница внешнего Identity](#23-приложение-граница-внешнего-identity).
-24. [Приложение: точные ответы всех операций](#24-приложение-точные-ответы-всех-операций).
+24. [Приложение: ответы операций MVP](#24-приложение-точные-ответы-всех-операций).
+25. [Файлы, квота и аватары](#25-файлы-квота-и-аватары).
 
 ## 1. Возможности и границы
 
@@ -66,13 +69,13 @@ API предоставляет:
 - Редактирование и удаление собственных комментариев, последующую модерацию.
 - Лайк текущего пользователя, счётчики и явную регистрацию открытия материала.
 - Локальные роли текущего пользователя и health endpoints.
+- Приватную библиотеку файлов, квоту, связи публикаций и собственный аватар.
 
 В API Blog отсутствуют:
 
 - Регистрация, login, refresh, logout, восстановление пароля, управление сессиями и аккаунтами.
-- Публичные профили, имена, аватары, email, биографии и список пользователей.
+- Публичные профили, имена, email, биографии и список пользователей.
 - HTTP-выдача/отзыв ролей, включая для Admin.
-- Загрузка изображений/файлов, библиотека медиа и проверка доступности обложки.
 - Поиск по тексту, фильтры автора/даты, произвольная сортировка и поиск по справочникам.
 - Уведомления, подписки, WebSocket/SSE, история лайков и список поставивших лайк.
 - Отложенная публикация, история редакций, отдельный черновик правок Published,
@@ -81,7 +84,7 @@ API предоставляет:
 
 Следствие для проектирования: интерфейс может включать эти функции только после
 согласования отдельного источника данных или расширения backend. Нельзя рисовать
-работающий поиск, загрузку обложки или управление ролями как уже поддержанные функции.
+работающий поиск или управление ролями как уже поддержанные функции.
 
 ## 2. Подключение и HTTP
 
@@ -101,8 +104,8 @@ HTTPS и публичный адрес production предоставляет о�
 
 | Заголовок запроса | Когда передавать | Значение |
 | --- | --- | --- |
-| `Accept` | Рекомендуется во всех API-запросах | `application/json, application/problem+json` |
-| `Content-Type` | Только для операций с JSON body | `application/json`; допустима кодировка UTF-8 |
+| `Accept` | JSON-запросы и скачивание | `application/json, application/problem+json` для JSON. Для скачивания передайте ожидаемый тип байтов или `*/*` |
+| `Content-Type` | Для запросов с телом | `application/json` для JSON, `application/octet-stream` для PUT байтов |
 | `Authorization` | На защищённых операциях обязательно, на публичном контенте по желанию | `Bearer <accessToken>` |
 | `X-Resource-Version` | Изменение/удаление существующей публикации, комментария, категории/тега; команды состояний | Один UUID из последнего разрешённого DTO этого ресурса |
 | `X-Anonymous-Visitor` | Только регистрация анонимного просмотра, если ID уже получен | Непрозрачное значение из `ViewResult.anonymousVisitorId` |
@@ -113,7 +116,7 @@ Authorization недопустимы. В анонимном режиме заг�
 
 ### 2.3. Тела и форматы ответов
 
-- Успех с телом: `application/json`. Ошибка: `application/problem+json`.
+- JSON-ответ при успехе использует `application/json`, скачивание — `application/octet-stream` или `image/png`. Ошибки API используют `application/problem+json`.
 - `201 Created` возвращает созданный DTO и `Location`.
 - `204 No Content` не имеет JSON body; нельзя безусловно вызывать `response.json()`.
 - GET, DELETE и команды без requestBody отправляются без тела. Даже `{}` и JSON `null`
@@ -258,7 +261,7 @@ decimal string. `BigInt()` после обычного `JSON.parse()` не ис�
 | `slug` | 1–120, `^[a-z0-9]+(-[a-z0-9]+)*$` | Строгий ввод; сервер не trim-ит и не переводит регистр |
 | `description` | `null` или 0–500 Unicode scalar values | Пустая строка допустима; автоматический trim не задан |
 | `markdown` | До 1 048 576 UTF-8 байт после JSON decoding | Пустой/whitespace допустим только в Draft; HTML доверенным не становится |
-| `coverUrl` | `null` или абсолютный HTTPS URL с host, 1–2048 scalar values | Файл не загружается и не проверяется |
+| `coverUrl` | `null`, абсолютный HTTPS URL с host до 2048 scalar values или точное эхо текущей управляемой обложки | Внешний URL сохраняется без загрузки файла |
 | `name` категории/тега | 1–80 scalar values после Unicode trim | Имена не являются ключом уникальности |
 | `content` комментария | 1–5000 scalar values после Unicode trim | Простой недоверенный текст; не Markdown |
 | `categoryIds` | Массив 0–5 UUID | Без повторов, все записи должны существовать |
@@ -365,14 +368,14 @@ GET /api/v1/publications?page=1&pageSize=20&sort=recent&categoryIds=20000000-000
 
 | DTO | Поля |
 | --- | --- |
-| `AuthorRef` | `id: UUID` |
-| `Me` | `id: UUID`, `roles: LocalRole[]` |
+| `AuthorRef` | `id: UUID`, `avatar: AvatarRef \| null` |
+| `Me` | `id: UUID`, `roles: LocalRole[]`, `avatar: AvatarRef \| null`, `avatarVersion: UUID` |
 | `Taxonomy` | `id: UUID`, `name: string`, `slug: string`, `version: UUID` |
 | `Counters` | `likeCount: int64`, `viewCount: int64`, `isLikedByCurrentUser: boolean` |
 
-`AuthorRef` не содержит displayName/avatar/profileUrl. Нельзя строить ссылку
-на профиль Identity по этому ID. При отсутствии отдельного профильного сервиса
-дизайн должен обходиться без выдуманных имён и аватаров.
+`AvatarRef` содержит `fileId`, `smallUrl` и `largeUrl`. Для автора без аватара
+покажите состояние по умолчанию. Имена и ссылки на профили требуют собственного
+контракта профильного сервиса.
 
 В `Me.roles` 1–4 уникальные роли, порядок `Reader`, `Author`, `Moderator`, `Admin`.
 `Taxonomy.version` есть и в публичных ответах, и во вложенных категориях/тегах.
@@ -387,7 +390,8 @@ GET /api/v1/publications?page=1&pageSize=20&sort=recent&categoryIds=20000000-000
 | `title` | string | Заголовок после trim |
 | `slug` | string | Адресный slug |
 | `description` | string/null | Краткое описание |
-| `coverUrl` | string/null | Внешняя HTTPS-обложка |
+| `coverUrl` | string/null | Эффективный URL внешней или управляемой обложки |
+| `coverFileId` | UUID/null | ID управляемой обложки |
 | `author` | AuthorRef | Локальный автор |
 | `createdAt` | UTC datetime | Создание Draft |
 | `updatedAt` | UTC datetime | Последнее изменение материала |
@@ -405,9 +409,9 @@ GET /api/v1/publications?page=1&pageSize=20&sort=recent&categoryIds=20000000-000
 
 | DTO | Состав |
 | --- | --- |
-| `Publication` | Все поля PublicationCard + `markdown: string` |
+| `Publication` | Все поля PublicationCard + `markdown`, `inlineImages`, `attachments` |
 | `WorkspaceCard` | Поля PublicationCard, но `firstPublishedAt: UTC datetime/null`, дополнительно `state: Draft/Published`, `version: UUID` |
-| `WorkspacePublication` | Все поля WorkspaceCard + `markdown: string` |
+| `WorkspacePublication` | Все поля WorkspaceCard + `markdown`, `inlineImages`, `attachments`, `inlineImageIds`, `attachmentIds` |
 
 В `WorkspaceCard` Markdown отсутствует. В никогда не опубликованном Draft
 `firstPublishedAt=null`; у снятого с публикации Draft значение сохраняется.
@@ -429,9 +433,10 @@ GET /api/v1/publications?page=1&pageSize=20&sort=recent&categoryIds=20000000-000
 ```
 
 Обязательны `title`, `slug`, `markdown`, `categoryIds`, `tagIds`.
-`description` и `coverUrl` необязательны и nullable. При PUT их отсутствие
-**сбрасывает значение в null**, а не сохраняет предыдущее. PUT полностью заменяет
-редактируемые поля. Массивы передаются всегда, в том числе `[]`.
+`description` и внешний `coverUrl` необязательны и nullable. При PUT их пропуск
+сбрасывает описание и внешний источник обложки. Передавайте `categoryIds` и
+`tagIds` всегда, в том числе пустыми. Правила сохранения и снятия управляемых
+связей приведены в [разделе Media](#25-файлы-квота-и-аватары).
 
 Нельзя передавать `id`, `author`, `authorId`, `state`, даты, счётчики и `version`.
 Version передаётся в заголовке существующего ресурса, состояние меняется командой.
@@ -574,7 +579,9 @@ Accept: application/json, application/problem+json
 ```json
 {
   "id": "10000000-0000-4000-8000-000000000001",
-  "roles": ["Reader", "Author"]
+  "roles": ["Reader", "Author"],
+  "avatar": null,
+  "avatarVersion": "10000000-0000-4000-8000-000000000002"
 }
 ```
 
@@ -624,7 +631,8 @@ GET /api/v1/publications/by-slug/first-post
   "slug": "first-post",
   "description": "Краткое описание",
   "coverUrl": null,
-  "author": { "id": "10000000-0000-4000-8000-000000000001" },
+  "coverFileId": null,
+  "author": { "id": "10000000-0000-4000-8000-000000000001", "avatar": null },
   "createdAt": "2026-10-27T05:00:00Z",
   "updatedAt": "2026-10-27T06:30:00Z",
   "firstPublishedAt": "2026-10-27T06:30:00Z",
@@ -633,7 +641,9 @@ GET /api/v1/publications/by-slug/first-post
   "likeCount": 3,
   "viewCount": 17,
   "isLikedByCurrentUser": false,
-  "markdown": "# Первый материал\n\nТекст публикации."
+  "markdown": "# Первый материал\n\nТекст публикации.",
+  "inlineImages": [],
+  "attachments": []
 }
 ```
 
@@ -1268,8 +1278,8 @@ Markdown рендерить согласованным renderer с запрет�
 композиции. Сервер не проксирует изображение и не подтверждает его доступность.
 
 Не использовать публичные DTO как источник скрытого текста. Данные moderation/
-edit context держать отдельно и очищать после потери прав/выхода. Имена/аватары
-не синтезировать из UUID; для них требуется отдельный согласованный контракт.
+edit context держать отдельно и очищать после потери прав или выхода.
+Для аватаров используйте URL из `author.avatar`.
 
 ### 19.3. Обновление UI после операций
 
@@ -1392,7 +1402,7 @@ Hidden/Deleted placeholders, ограничения depth и состояния 
 - [ ] Bodyless запросы не отправляют `{}`/`null`, 204 не парсится как JSON.
 - [ ] Отработаны не-JSON proxy error, offline, отмена, ошибка загрузки обложки и retry.
 - [ ] Ошибка необязательного views не скрывает успешно загруженный материал.
-- [ ] UI не требует от Blog имён, аватаров, поиска, загрузки файлов и управления ролями.
+- [ ] UI поддерживает отсутствие аватара и пустые коллекции медиа.
 - [ ] Identity logout очищает client state немедленно, без ожидания отказа Blog JWT.
 
 ## 22. Настройки и вопросы для интеграции
@@ -1410,7 +1420,7 @@ Hidden/Deleted placeholders, ограничения depth и состояния 
 | Публичные URL страниц frontend | Например `/posts/:slug`; API не задаёт маршруты UI |
 | Markdown renderer/санитизация и политика изображений | Безопасный вывод недоверенного текста |
 | Анонимное хранилище и его scope | Стабильность anonymousVisitorId в одной установке |
-| Отдельный профильный сервис, если нужен | Имена/аватары; без него UX использует ограниченный AuthorRef |
+| Отдельный профильный сервис, если нужен | Имена и расширенные профили |
 | Механизм выдачи тестовых ролей | Проверка Author/Moderator/Admin через защищённый Operator |
 
 До уточнения адресов frontend можно проектировать и тестировать на mocks этого
@@ -1420,7 +1430,7 @@ Hidden/Deleted placeholders, ограничения depth и состояния 
 
 ## 23. Приложение: граница внешнего Identity
 
-Это **отдельный сервис**, не операции Blog API и не часть перечня 35 операций.
+Identity обслуживает регистрацию, вход и жизненный цикл аккаунта.
 В репозитории Blog нет полного OpenAPI Identity. Ниже приведён только минимум,
 который подтверждён существующим
 [smoke-сценарием](../../scripts/validation/Invoke-IdentityIntegrationSmoke.ps1)
@@ -1504,3 +1514,49 @@ Problem; пустое тело успеха обозначено `—`.
 | `GET /health/live` | `healthLive` | 200 Health | — |
 | `GET /health/ready` | `healthReady` | 200 Health | 503 |
 <!-- operation-responses:end -->
+
+## 25. Файлы, квота и аватары
+
+Все пути в таблице имеют префикс `/api/v1`. Успешные ответы Media используют
+`Cache-Control: no-store`. Закрытые операции требуют Bearer. Публичные ссылки
+разрешайте относительно origin Blog API.
+
+| Метод и путь | Результат |
+| --- | --- |
+| POST `/media/uploads` | 201 `Upload` и `Location`. Требуется UUID `Idempotency-Key`, для Avatar также `X-Resource-Version` |
+| PUT `/media/uploads/{id}/content` | 204 после записи байтов. Тело `application/octet-stream` |
+| POST `/media/uploads/{id}/complete` | 202 `Upload` во время обработки, 200 `UploadResult` после завершения. Тело отсутствует |
+| GET `/media/uploads/{id}` | 200 `Upload` владельца |
+| DELETE `/media/uploads/{id}` | 204 после отмены незавершённой загрузки |
+| GET `/media/files` | 200 `FilePage` готовых файлов. Параметры `page`, `pageSize`, для Admin также `ownerId` |
+| GET `/media/files/{id}` | 200 `FileMetadata` |
+| DELETE `/media/files/{id}` | 204 после удаления. Файл с активной связью даёт 409 `file_in_use` |
+| GET `/media/files/{id}/content` | 200 оригинал по умолчанию или PNG с `variant=display` |
+| GET `/media/allowance` | 200 `Allowance` в байтах. Для Admin доступен `ownerId` |
+| GET `/publications/{publicationId}/media/{fileId}/content` | 200 для доступной публикации и активной связи. Требуется `variant=attachment\|display` |
+| GET `/me/avatar` | 200 `AvatarState`, включая версию пустого состояния |
+| DELETE `/me/avatar` | 200 обновлённый `AvatarState`. Требуется `X-Resource-Version` |
+| GET `/avatars/{fileId}/{size}.png` | 200 публичный PNG текущего аватара. Размер 256 или 512 |
+
+Для Attachment, PublicationImage и Avatar лимиты исходника составляют 50, 10 и
+5 MiB соответственно. Обычные загрузки требуют Author или Admin, свой аватар
+доступен Reader. Передайте фактическую длину в `declaredSize`. После 202 опрашивайте
+URL состояния. Резерв живёт до исходного `expiresAt` либо до терминального
+перехода. Для повтора init сохраняйте исходный ключ, payload и версию аватара.
+Для повтора PUT отправляйте те же байты. При временном 503 учитывайте
+`Retry-After`. После 413 от ingress прочитайте состояние загрузки.
+
+При записи публикации `coverFileId` назначает управляемую обложку. Ненулевой
+внешний `coverUrl` снимает управляемую связь. Вместе допускается только один
+ненулевой источник. При PUT пропущенные `coverFileId`, `inlineImageIds` и
+`attachmentIds` сохраняют связи. Явный `coverFileId: null` снимает управляемую
+обложку. Пустые массивы снимают соответствующие связи, а `null` в массиве
+связей даёт 400. Пропуск `coverFileId` вместе с точным эхом текущего
+управляемого `coverUrl` сохраняет обложку. Лимиты связей — одна обложка,
+50 inline images и 20 attachments. В detail массивы всегда присутствуют.
+
+Для замены аватара используйте версию из `GET /me/avatar` либо `Me.avatarVersion`
+при init загрузки Avatar. На 409 перечитайте состояние. Старый URL после замены
+или удаления может вернуть 404. Для скачивания используйте URL из DTO,
+а для вложения или оригинала учитывайте `Content-Disposition: attachment`.
+Изображения выдаются как PNG, скрытые комментарии сохраняют `author: null`.

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text.Json;
 using BlogEngine.Infrastructure.Persistence;
 using BlogEngine.IntegrationTests.Fixtures;
 using Microsoft.EntityFrameworkCore;
@@ -9,34 +11,67 @@ namespace BlogEngine.IntegrationTests.Operations;
 
 public sealed class MediaMigrationTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>
 {
+    private const string MvpBaseline = "20261024081130_AddViewDeduplication";
     private static BlogDbContext Context(string connection) => new(new DbContextOptionsBuilder<BlogDbContext>().UseNpgsql(connection).Options);
 
     [Fact]
     public async Task AdditiveUpgradeKeepsMvpDataAndExternalCover()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await postgres.CreateDatabaseAsync(Context, ct);
+        await using var database = await postgres.CreateDatabaseAsync(Context, ct, targetMigration: MvpBaseline);
         await using var db = Context(database.ConnectionString);
         Assert.Contains(db.Database.GetMigrations(), migration => migration.EndsWith("_AddMedia", StringComparison.Ordinal));
-        await db.GetService<IMigrator>().MigrateAsync("20261024081130_AddViewDeduplication", ct);
         await db.Database.ExecuteSqlRawAsync("""
             INSERT INTO accounts.local_users(id,issuer,subject,created_at) VALUES ('00000000-0000-0000-0000-000000000001','https://fixture','00000000-0000-0000-0000-000000000003',now());
             INSERT INTO publishing.publications(id,author_id,title,slug,markdown,cover_url,state,version,created_at,updated_at)
             VALUES ('00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','Existing','existing','body','https://example.test/cover.png',0,gen_random_uuid(),now(),now());
             """, ct);
-        await db.Database.MigrateAsync(ct);
+        var migrator = db.GetService<IMigrator>();
+        var script = migrator.GenerateScript(MvpBaseline,
+            options: MigrationsSqlGenerationOptions.Idempotent | MigrationsSqlGenerationOptions.NoTransactions);
+        var timer = Stopwatch.StartNew();
+        string[] locks;
+        double elapsedMilliseconds;
+        await using (var transaction = await db.Database.BeginTransactionAsync(ct))
+        {
+            await db.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout = '5s'; SET LOCAL statement_timeout = '30s';", ct);
+            await db.Database.ExecuteSqlRawAsync(script, ct);
+            locks = await db.Database.SqlQueryRaw<string>("""
+                SELECT DISTINCT n.nspname || '.' || c.relname || ':' || l.mode AS "Value"
+                FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE l.pid = pg_backend_pid() AND l.granted AND c.relkind = 'r'
+                    AND n.nspname IN ('accounts', 'publishing', 'media')
+                ORDER BY 1
+                """).ToArrayAsync(ct);
+            await transaction.CommitAsync(ct);
+            elapsedMilliseconds = timer.Elapsed.TotalMilliseconds;
+        }
+        Assert.Contains(locks, item => item.StartsWith("publishing.publications:", StringComparison.Ordinal));
+        Assert.Contains(locks, item => item.StartsWith("accounts.local_users:", StringComparison.Ordinal));
+        await db.Database.ExecuteSqlRawAsync(script, ct);
+        await db.Database.ExecuteSqlRawAsync(script, ct);
+        Assert.Equal(db.Database.GetMigrations(), await db.Database.GetAppliedMigrationsAsync(ct));
         Assert.Equal("https://example.test/cover.png", await db.Publications.Select(p => p.CoverUrl).SingleAsync(ct));
         Assert.Equal(1, await db.Database.SqlQueryRaw<int>("SELECT version AS \"Value\" FROM media.schema_version").SingleAsync(ct));
         Assert.DoesNotContain(db.Model.GetEntityTypes().SelectMany(t => t.GetKeys()), k => !k.IsPrimaryKey() && k.Properties.Any(p => p.Name == "State"));
         Assert.False(db.Database.HasPendingModelChanges());
+        await File.WriteAllTextAsync(PublishingFixture.ArtifactPath("migrations/media-upgrade.json"), JsonSerializer.Serialize(new
+        {
+            baseline = MvpBaseline,
+            elapsedMilliseconds,
+            locks,
+            idempotentReplays = 2,
+            preservedLegacyCover = true,
+        }), ct);
     }
 
     [Fact]
     public async Task GrantsWorkBeforeAndAfterUpgradeWithoutDdlOrOperatorMediaAccess()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var database = await postgres.CreateDatabaseAsync(Context, ct); await using var db = Context(database.ConnectionString);
-        await db.GetService<IMigrator>().MigrateAsync("20261024081130_AddViewDeduplication", ct);
+        await using var database = await postgres.CreateDatabaseAsync(Context, ct, targetMigration: MvpBaseline);
+        await using var db = Context(database.ConnectionString);
         var roles = new[] { "owner_role", "migration_role", "runtime_role", "operator_role" }.ToDictionary(k => k, _ => "media_" + Guid.NewGuid().ToString("N"));
         await using var admin = new NpgsqlConnection(database.ConnectionString); await admin.OpenAsync(ct);
         foreach (var role in roles.Values)

@@ -14,7 +14,7 @@ public static class PublicationCommandEndpoints
         {
             var actor = await actors.GetRequiredAsync(ct);
             var result = await service.CreateAsync(actor, body.ToContent(), ct);
-            return Results.Created($"/api/v1/workspace/publications/{result.Publication.Id:D}", WorkspacePublication.Detail(result));
+            return TypedResults.Created($"/api/v1/workspace/publications/{result.Publication.Id:D}", WorkspacePublication.Detail(result));
         }).WithName("createPublication");
         app.MapPut("/api/v1/publications/{id}", async (Guid id, PublicationWrite body, HttpRequest request, CurrentActorAccessor actors, PublicationService service, CancellationToken ct) =>
         {

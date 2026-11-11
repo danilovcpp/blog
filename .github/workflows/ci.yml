@@ -10,7 +10,8 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # The real Garage boundary test processes 10,000 retained object records before the container stress check.
+    timeout-minutes: 45
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
       DOTNET_NOLOGO: "1"
@@ -38,7 +39,7 @@ jobs:
         run: dotnet format BlogEngine.slnx --verify-no-changes --no-restore
       - name: Unit tests
         run: dotnet test tests/BlogEngine.UnitTests/BlogEngine.UnitTests.csproj -c Release --no-build --logger "trx;LogFileName=unit.trx" --results-directory artifacts/test-results
-      - name: Integration tests with real PostgreSQL
+      - name: Integration tests with real PostgreSQL and Garage
         run: dotnet test tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj -c Release --no-build --logger "trx;LogFileName=integration.trx" --results-directory artifacts/test-results
       - name: Reject empty or skipped test suites
         if: always()
@@ -53,6 +54,14 @@ jobs:
               throw "Every discovered test must pass in $suite; skipped tests are failures."
             }
           }
+          [xml]$integration = Get-Content -LiteralPath 'artifacts/test-results/integration.trx' -Raw
+          $classes = $integration.TestRun.TestDefinitions.UnitTest.TestMethod.className
+          foreach ($required in @('GarageStorageTests', 'MediaCleanupTests', 'MediaMigrationTests', 'ConsumerWalkthroughTests')) {
+            if (!($classes -like "*.$required")) { throw "Required integration coverage is missing for $required." }
+          }
+      - name: Media pressure and restart under a 1 GiB limit
+        shell: pwsh
+        run: ./scripts/validation/Invoke-MediaResourceValidation.ps1
       - name: Upload verification results
         if: always()
         uses: actions/upload-artifact@v4

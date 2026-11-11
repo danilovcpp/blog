@@ -25,8 +25,8 @@ or one another. Credentials never belong in Git, shell arguments or reports.
 
 `ops/database/permissions.sql` uses psql identifier variables `owner_role`,
 `migration_role`, `runtime_role`, `operator_role`. Run it as the database provisioner
-after applying the complete reviewed chain (currently AddViewDeduplication). It changes ownership and grants only on existing
-Accounts/Publishing/Engagement/Discussions objects, revokes PUBLIC schema/database creation and temporary-table privileges,
+after applying the complete reviewed chain (currently AddMedia). It changes ownership and grants on existing
+Accounts/Publishing/Engagement/Discussions/Media objects, revokes PUBLIC schema/database creation and temporary-table privileges,
 and gives no elevated application roles. Use a dedicated database; pre-existing grants
 or other memberships must be removed during provisioning. Run the script after each
 migration whose tables require new grants. Operator has no content, DDL or audit
@@ -115,3 +115,21 @@ visitor key ring. Startup never applies DDL. Down removes active dedup windows w
 preserving counters; keep the additive schema when rolling back the executable to
 preserve those windows. See [anonymous-visitors.md](anonymous-visitors.md) for staged
 key rotation, cleanup timing, limits and the consequences of destructive rollback.
+
+AddMedia creates the Media tables and readiness marker and adds the unique
+publication/owner index used by Media foreign keys. It preserves MVP rows and
+external covers. The index build locks publication writes, and the foreign keys
+lock referenced Accounts and Publishing relations during the transaction. The
+migration suite applies the chain on an empty database, upgrades an
+AddViewDeduplication database with an existing publication, replays idempotent SQL
+twice, and records observed relation locks and elapsed time in
+`artifacts/validation/migrations/media-upgrade.json`. Measure on a production-sized
+copy before setting the deployment window and migration session timeouts.
+
+Run permissions.sql after applying AddMedia. Runtime gets DML on the Media
+tables required by uploads, usage, avatars and cleanup, plus read-only access to
+the schema marker. Files, uploads, allowances, objects and cleanup job records
+retain tombstones or ledger history and have no runtime DELETE grant. Operator
+has no Media access. Integration tests check the grants and discriminator
+constraints against PostgreSQL. Use the coordinated [Media rollout](deployment.md)
+and [recovery procedure](media-recovery.md) for production.
