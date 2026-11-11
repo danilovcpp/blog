@@ -1,4 +1,17 @@
 services:
+  garage:
+    profiles: ["media"]
+    image: dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+    environment:
+      GARAGE_RPC_SECRET: ${BLOG_GARAGE_RPC_SECRET:?Provide a protected 32-byte hex RPC secret}
+      GARAGE_ADMIN_TOKEN: ${BLOG_GARAGE_ADMIN_TOKEN:?Provide a protected provisioning token}
+    ports:
+      - "127.0.0.1:${BLOG_GARAGE_S3_PORT:-3900}:3900"
+      - "127.0.0.1:${BLOG_GARAGE_ADMIN_PORT:-3903}:3903"
+    volumes:
+      - ./ops/media/garage.development.toml:/etc/garage.toml:ro
+      - garage-metadata:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
   postgres:
     image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
     environment:
@@ -21,4 +34,6 @@ services:
       start_period: 10s
 
 volumes:
+  garage-metadata:
+  garage-data:
   postgres-data:

@@ -13,6 +13,7 @@ coverage/
 # Credentials and per-machine configuration (package lock files are versioned)
 .env
 .env.*
+.env*
 *.local.json
 *.pfx
 *.p12

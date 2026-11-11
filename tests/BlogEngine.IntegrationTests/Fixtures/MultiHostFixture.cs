@@ -14,13 +14,13 @@ internal sealed class MultiHostFixture : IAsyncDisposable
     public ApiFactory Second { get; }
     public HttpClient Replica { get; }
     public ControlledDatabaseClock Clock { get; }
-    public static async Task<MultiHostFixture> StartAsync(PostgresFixture postgres, CancellationToken ct)
+    public static async Task<MultiHostFixture> StartAsync(PostgresFixture postgres, CancellationToken ct, GarageFixture? mediaStorage = null)
     {
         var clock = new ControlledDatabaseClock();
-        var first = await PublishingFixture.StartAsync(postgres, ct, viewClock: clock);
+        var first = await PublishingFixture.StartAsync(postgres, ct, viewClock: clock, mediaStorage: mediaStorage);
         var connection = new NpgsqlConnectionStringBuilder(first.Factory.Services.GetRequiredService<IOptions<ApiOptions>>().Value.ConnectionString)
         { ApplicationName = "views-replica-" + Guid.NewGuid().ToString("N") }.ConnectionString;
-        var second = new ApiFactory(connection, first.Identity) { ViewClock = clock, VisitorKeys = first.Factory.VisitorKeys };
+        var second = new ApiFactory(connection, first.Identity) { ViewClock = clock, VisitorKeys = first.Factory.VisitorKeys, MediaStorage = mediaStorage };
         return new(first, second, clock);
     }
     public async ValueTask DisposeAsync()

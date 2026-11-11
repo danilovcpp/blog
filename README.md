@@ -151,7 +151,7 @@ DbContext получают разные PostgreSQL connections. Pool закры�
 
 ### Локальный PostgreSQL
 
-`compose.yaml` содержит только PostgreSQL **18.6**, закреплённый digest, полученным
+`compose.yaml` содержит PostgreSQL **18.6**, закреплённый digest, полученным
 через `docker pull postgres:18.6`. Тот же образ используется тестами. БД создаётся
 с UTF-8, locale/collation `C`, UTC, без дополнительных расширений. Порт доступен
 только на loopback; данные находятся в локальном Docker volume.
@@ -161,6 +161,12 @@ DbContext получают разные PostgreSQL connections. Pool закры�
 `BLOG_POSTGRES_PORT` необязателен (5432). Пароль не передавайте в аргументах команд
 или version-controlled файлах. Compose завершится ошибкой, если credentials не заданы.
 Изменение env не перенастраивает уже инициализированный volume.
+
+Профиль `media` добавляет single-node Garage **2.5.0** с проверенным manifest
+digest, постоянными metadata/data volumes и loopback S3/Admin endpoints.
+Layout и закрытые buckets подготавливаются отдельным операторским шагом;
+runtime key не получает owner/create-bucket прав. Настройка и protected secret
+provider описаны в [ops/media/README.md](ops/media/README.md).
 
 Bootstrap credentials Compose предназначены для локальной инициализации.
 **API, Operator и миграции должны использовать разные учётные записи**:

@@ -1,0 +1,19 @@
+# Install on each of three nodes in independent failure domains.
+# Supply GARAGE_RPC_SECRET and GARAGE_ADMIN_TOKEN through the protected provider.
+# Replace the node's private RPC address; bootstrap peers are nodeId@private-address:3901.
+# Firewall S3 to Blog/provisioning and RPC/Admin to storage/operators only.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "lmdb"
+replication_factor = 3
+consistency_mode = "consistent"
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "REPLACE_NODE_PRIVATE_ADDRESS:3901"
+bootstrap_peers = []
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+
+[admin]
+api_bind_addr = "[::]:3903"

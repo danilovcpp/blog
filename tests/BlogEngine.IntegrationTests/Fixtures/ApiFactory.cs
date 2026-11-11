@@ -17,6 +17,7 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
     public AdjustableTimeProvider Time => identity.Time;
     public CapturedLogs Logs { get; } = new();
     public DatabaseClock? ViewClock { get; init; }
+    public GarageFixture? MediaStorage { get; init; }
     public IReadOnlyDictionary<string, string> VisitorKeys { get; init; } = new Dictionary<string, string>
     { ["fixture"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) };
 
@@ -36,6 +37,8 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
                 ["AnonymousVisitors:ActiveKeyId"] = VisitorKeys.Keys.First(),
             };
             foreach (var (id, secret) in VisitorKeys) { values["AnonymousVisitors:Keys:" + id] = secret; }
+            if (MediaStorage is not null)
+            { foreach (var (key, value) in MediaStorage.Configuration) { values[key] = value; } }
             configuration.AddInMemoryCollection(values);
         });
         builder.ConfigureTestServices(services =>

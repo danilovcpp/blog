@@ -1,0 +1,30 @@
+# Deployment gate: replace all placeholders and record the real failure-domain test.
+image: dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+replication_factor: 3
+consistency_mode: consistent
+nodes:
+  - node_id: REPLACE_NODE_ID_A
+    rpc_address: REPLACE_PRIVATE_ADDRESS_A:3901
+    failure_domain: REPLACE_INDEPENDENT_DOMAIN_A
+    metadata_volume: REPLACE_PERSISTENT_METADATA_A
+    data_volume: REPLACE_PERSISTENT_DATA_A
+    metadata_capacity_bytes: null
+    data_capacity_bytes: null
+    capacity_bytes: null
+  - node_id: REPLACE_NODE_ID_B
+    rpc_address: REPLACE_PRIVATE_ADDRESS_B:3901
+    failure_domain: REPLACE_INDEPENDENT_DOMAIN_B
+    metadata_volume: REPLACE_PERSISTENT_METADATA_B
+    data_volume: REPLACE_PERSISTENT_DATA_B
+    metadata_capacity_bytes: null
+    data_capacity_bytes: null
+    capacity_bytes: null
+  - node_id: REPLACE_NODE_ID_C
+    rpc_address: REPLACE_PRIVATE_ADDRESS_C:3901
+    failure_domain: REPLACE_INDEPENDENT_DOMAIN_C
+    metadata_volume: REPLACE_PERSISTENT_METADATA_C
+    data_volume: REPLACE_PERSISTENT_DATA_C
+    metadata_capacity_bytes: null
+    data_capacity_bytes: null
+    capacity_bytes: null
+single_node_loss_evidence: REPLACE_VALIDATION_REPORT

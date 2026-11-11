@@ -15,5 +15,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <Using Include="Xunit" />
     <None Include="../../ops/database/permissions.sql" Link="permissions.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../ops/media/garage.development.toml" Link="garage.development.toml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../ops/media/Provision-MediaStorage.ps1" Link="Provision-MediaStorage.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/ProvisionFixture.ps1" Link="ProvisionFixture.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
