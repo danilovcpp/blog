@@ -18,7 +18,8 @@ public sealed class RequestContractValidation(RequestDelegate next)
             try { accept = context.Request.GetTypedHeaders().Accept; }
             catch (FormatException) { throw new BadHttpRequestException("Invalid Accept header."); }
             if (accept is { Count: > 0 } && !accept.Any(value => value.Quality.GetValueOrDefault(1) > 0 &&
-                (new MediaTypeHeaderValue(binary?.ContentType ?? "application/json").IsSubsetOf(value) || new MediaTypeHeaderValue("application/problem+json").IsSubsetOf(value))))
+                (new MediaTypeHeaderValue(binary?.ContentType ?? "application/json").IsSubsetOf(value) ||
+                 (binary?.AlternateContentType is { } alternate && new MediaTypeHeaderValue(alternate).IsSubsetOf(value)) || new MediaTypeHeaderValue("application/problem+json").IsSubsetOf(value))))
             {
                 await ProblemDetailsHandler.WriteAsync(context, 406, "not_acceptable");
                 return;

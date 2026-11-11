@@ -4,13 +4,14 @@ namespace BlogEngine.Core.Publishing.Contracts;
 public interface IPublicationWriteScope
 {
     Task<T> ExecuteAsync<T>(Guid publicationId,
-        Func<IPublicationWriteSession, CancellationToken, Task<T>> operation, CancellationToken cancellationToken);
+        Func<IPublicationWriteSession, CancellationToken, Task<T>> operation, CancellationToken cancellationToken, Guid? roleActorId = null);
 }
 
 public interface IPublicationWriteSession
 {
     PublicationAccess Publication { get; }
     DateTimeOffset UtcNow { get; }
+    BlogEngine.Core.Accounts.Contracts.CurrentActor? RoleActor { get; }
     Task AdjustCountersAsync(CounterDelta delta, CancellationToken cancellationToken);
 }
 

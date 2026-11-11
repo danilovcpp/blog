@@ -7,7 +7,8 @@ public sealed record FileMetadataDto(Guid Id, Guid OwnerId, MediaPurpose Purpose
     DateTimeOffset CreatedAt, string State, string? OriginalUrl, string? DisplayUrl)
 {
     public static FileMetadataDto From(LibraryFile file) => new(file.Id, file.OwnerId, file.Purpose, file.Name, file.Size,
-        file.ContentType, file.CreatedAt, "Ready", $"/api/v1/media/files/{file.Id:D}/content?variant=original", null);
+        file.ContentType, file.CreatedAt, "Ready", $"/api/v1/media/files/{file.Id:D}/content?variant=original",
+        file.Purpose == MediaPurpose.PublicationImage ? $"/api/v1/media/files/{file.Id:D}/content?variant=display" : null);
 }
 
 public sealed record FilePageDto(int Page, int PageSize, IReadOnlyList<FileMetadataDto> Items, bool HasNextPage)

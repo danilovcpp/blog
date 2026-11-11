@@ -6,7 +6,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace BlogEngine.Api.Configuration;
 
-public sealed record BinaryEndpoint(string ContentType, bool RawUpload = false);
+public sealed record BinaryEndpoint(string ContentType, bool RawUpload = false, string? AlternateContentType = null);
 public sealed record MediaDownloadAccess(MediaBucketKind Bucket, string Key, long Length, ReadOnlyMemory<byte> Sha256,
     string ContentType, string? FileName = null);
 
@@ -29,6 +29,10 @@ public sealed class MediaBinaryTransport(IMediaObjectStorage storage, IMediaSpoo
     {
         var ct = context.RequestAborted;
         var access = await authorize(ct) ?? throw new DomainError("resource_not_found");
+        var accept = context.Request.GetTypedHeaders().Accept;
+        if (accept is { Count: > 0 } && !accept.Any(value => value.Quality.GetValueOrDefault(1) > 0 &&
+            new MediaTypeHeaderValue(access.ContentType).IsSubsetOf(value)))
+        { await BlogEngine.Api.Diagnostics.ProblemDetailsHandler.WriteAsync(context, 406, "not_acceptable"); return; }
         IMediaTransfer? transfer = null;
         IMediaSpoolFile? file = null;
         MediaStorageException? failure = null;

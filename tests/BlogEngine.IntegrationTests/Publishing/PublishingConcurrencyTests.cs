@@ -84,7 +84,10 @@ public sealed class PublishingConcurrencyTests(PostgresFixture postgres) : IClas
         }
         else
         {
-            second = new PublicationStore(secondDb, new PublicationWriteScope(secondDb)).MutateAsync(
+            second = new PublicationStore(secondDb, new PublicationWriteScope(secondDb),
+                new BlogEngine.Infrastructure.Persistence.Accounts.AccountRoleWriteGuard(secondDb),
+                new BlogEngine.Infrastructure.Persistence.Media.PublicationMediaUsages(secondDb),
+                new BlogEngine.Infrastructure.ReadModels.WorkspaceQueries(secondDb)).MutateAsync(
                 new CurrentActor(draft.GetProperty("author").GetProperty("id").GetGuid(), [LocalRole.Reader, LocalRole.Author]), pubId,
                 () => draft.GetProperty("version").GetGuid(), PublicationCommand.Edit, new("Changed", "hello", "changed", null, null, [categoryId], []), ct);
         }

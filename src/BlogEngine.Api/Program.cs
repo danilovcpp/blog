@@ -9,7 +9,8 @@ var app = builder.Build();
 app.UseMiddleware<RequestLogging>();
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/api/v1/media"))
+    if (context.Request.Path.StartsWithSegments("/api/v1/media") ||
+        (context.Request.Path.StartsWithSegments("/api/v1/publications") && context.Request.Path.Value!.Contains("/media/", StringComparison.Ordinal)))
     { context.Response.OnStarting(() => { context.Response.Headers.CacheControl = "no-store"; return Task.CompletedTask; }); }
     await next(context);
 });
@@ -49,6 +50,7 @@ app.MapLikeEndpoints();
 app.MapViewEndpoints();
 app.MapMediaUploadEndpoints();
 app.MapMediaLibraryEndpoints();
+app.MapPublicationMediaEndpoints();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();

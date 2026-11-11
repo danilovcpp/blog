@@ -1,3 +1,4 @@
+using BlogEngine.Core.Media.Contracts;
 using BlogEngine.Core.Shared;
 
 namespace BlogEngine.Core.Publishing.Domain;
@@ -5,7 +6,7 @@ namespace BlogEngine.Core.Publishing.Domain;
 public enum PublicationState : short { Draft, Published }
 
 public sealed record PublicationContent(string Title, string Slug, string Markdown, string? Description, string? CoverUrl,
-    IReadOnlyList<Guid> CategoryIds, IReadOnlyList<Guid> TagIds)
+    IReadOnlyList<Guid> CategoryIds, IReadOnlyList<Guid> TagIds, PublicationMediaChange? Media = null)
 {
     public PublicationContent Validate()
     {
@@ -13,7 +14,7 @@ public sealed record PublicationContent(string Title, string Slug, string Markdo
         TextRules.RequireSlug(Slug);
         TextRules.RequireMarkdown(Markdown);
         if (Description is not null && TextRules.ScalarLength(Description, "description") > 500) { throw DomainError.Validation("description"); }
-        if (CoverUrl is not null && (TextRules.ScalarLength(CoverUrl, "coverUrl") > 2048 ||
+        if (CoverUrl is not null && !PublicationMediaUrls.IsManaged(CoverUrl) && (TextRules.ScalarLength(CoverUrl, "coverUrl") > 2048 ||
             !CoverUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || !Uri.TryCreate(CoverUrl, UriKind.Absolute, out var uri) ||
             uri.Scheme != Uri.UriSchemeHttps || string.IsNullOrEmpty(uri.Host))) { throw DomainError.Validation("coverUrl"); }
         PublicationClassification.Validate(CategoryIds, TagIds);

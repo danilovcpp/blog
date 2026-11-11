@@ -70,6 +70,8 @@ internal sealed class ReadingSqlCapture : DbCommandInterceptor
     public void Clear() { lock (commands) { commands.Clear(); } }
     private void Capture(DbCommand command)
     {
+        // Transaction control is not a data query and cannot be passed to EXPLAIN.
+        if (command.CommandText.StartsWith("SET TRANSACTION", StringComparison.Ordinal)) { return; }
         var parameters = command.Parameters.Cast<NpgsqlParameter>().Select(p => new NpgsqlParameter(p.ParameterName, p.NpgsqlDbType) { Value = p.Value }).ToArray();
         lock (commands) { commands.Add(new(command.CommandText, parameters)); }
     }

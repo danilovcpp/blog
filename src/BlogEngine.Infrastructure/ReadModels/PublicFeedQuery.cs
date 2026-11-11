@@ -1,3 +1,5 @@
+using System.Data;
+using BlogEngine.Core.Media.Contracts;
 using BlogEngine.Core.ReadModels;
 using BlogEngine.Core.Shared;
 using BlogEngine.Infrastructure.Persistence;
@@ -11,6 +13,8 @@ public sealed class PublicFeedQuery(BlogDbContext db) : IPublicFeedReader
 {
     public async Task<PageResult<PublicationFeed>> ReadAsync(PublicationFeedRequest request, Guid? actorId, CancellationToken cancellationToken)
     {
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", cancellationToken);
         var categories = request.CategoryIds.ToArray(); var tags = request.TagIds.ToArray();
         if (categories.Length != 0)
         {
@@ -26,6 +30,7 @@ public sealed class PublicFeedQuery(BlogDbContext db) : IPublicFeedReader
         var order = request.Sort == PublicationSort.Popular ? "p.like_count DESC, p.first_published_at DESC, p.id DESC" : "p.first_published_at DESC, p.id DESC";
         var sql = """
             SELECT p.id AS "Id", p.title AS "Title", p.slug AS "Slug", p.description AS "Description", p.cover_url AS "CoverUrl",
+                (SELECT u.file_id FROM media.publication_usages u WHERE u.publication_id=p.id AND u.role=0) AS "CoverFileId",
                 p.author_id AS "AuthorId", p.created_at AS "CreatedAt", p.updated_at AS "UpdatedAt", p.first_published_at AS "FirstPublishedAt",
                 p.like_count AS "LikeCount", p.view_count AS "ViewCount",
                 (@actor_id IS NOT NULL AND EXISTS (SELECT 1 FROM engagement.likes l WHERE l.publication_id=p.id AND l.user_id=@actor_id)) AS "IsLikedByCurrentUser"
@@ -44,11 +49,12 @@ public sealed class PublicFeedQuery(BlogDbContext db) : IPublicFeedReader
         var page = PageResult<FeedRow>.FromLookahead(rows, request.Page);
         if (page.Items.Count == 0) { return new([], page.Page, page.PageSize, page.HasNextPage); }
         var classification = await PublicationClassificationQuery.LoadAsync(db, page.Items.Select(p => p.Id).ToArray(), cancellationToken);
-        return new(page.Items.Select(p => new PublicationFeed(p.Id, p.Title, p.Slug, p.Description, p.CoverUrl, new(p.AuthorId), p.CreatedAt, p.UpdatedAt,
-            p.FirstPublishedAt, classification.Categories[p.Id].ToArray(), classification.Tags[p.Id].ToArray(), p.LikeCount, p.ViewCount, p.IsLikedByCurrentUser)).ToArray(),
+        await tx.CommitAsync(cancellationToken);
+        return new(page.Items.Select(p => new PublicationFeed(p.Id, p.Title, p.Slug, p.Description, p.CoverFileId is { } cover ? PublicationMediaUrls.Display(p.Id, cover) : p.CoverUrl, new(p.AuthorId), p.CreatedAt, p.UpdatedAt,
+            p.FirstPublishedAt, classification.Categories[p.Id].ToArray(), classification.Tags[p.Id].ToArray(), p.LikeCount, p.ViewCount, p.IsLikedByCurrentUser, p.CoverFileId)).ToArray(),
             page.Page, page.PageSize, page.HasNextPage);
     }
 
     private sealed record FeedRow(Guid Id, string Title, string Slug, string? Description, string? CoverUrl, Guid AuthorId,
-        DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset FirstPublishedAt, long LikeCount, long ViewCount, bool IsLikedByCurrentUser);
+        DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset FirstPublishedAt, long LikeCount, long ViewCount, bool IsLikedByCurrentUser, Guid? CoverFileId);
 }

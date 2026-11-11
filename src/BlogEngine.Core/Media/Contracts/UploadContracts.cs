@@ -41,8 +41,7 @@ public sealed record MediaProcessingClaim(Guid UploadId, Guid OwnerId, Guid File
 public interface IMediaUploadProcessor
 {
     MediaPurpose Purpose { get; }
-    Task VerifyAsync(MediaProcessingClaim claim, CancellationToken ct);
-    Task FinalizeAsync(MediaProcessingClaim claim, CancellationToken ct);
+    Task ProcessAsync(MediaProcessingClaim claim, CancellationToken ct);
 }
 
 public interface IMediaProcessingStore
@@ -53,6 +52,7 @@ public interface IMediaProcessingStore
     Task RenewAsync(MediaProcessingClaim claim, CancellationToken ct);
     Task CompleteAttachmentAsync(MediaProcessingClaim claim, CancellationToken ct);
     Task RetryAsync(MediaProcessingClaim claim, CancellationToken ct);
+    Task RejectAsync(MediaProcessingClaim claim, string code, CancellationToken ct);
 }
 
 public interface IMediaProcessingLease

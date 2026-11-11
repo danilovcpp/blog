@@ -9,6 +9,25 @@ namespace BlogEngine.IntegrationTests.Media;
 // This same suite also runs inside the production ASP.NET Linux base image (media-codec-validation target).
 public sealed class ImageCodecTests
 {
+    [Theory]
+    [InlineData(3000, 1500, 2560, 1280)]
+    [InlineData(3, 2, 3, 2)]
+    public async Task PublicationRendererFitsWithoutUpscaleAndPreservesAlpha(int width, int height, int expectedWidth, int expectedHeight)
+    {
+        var ct = TestContext.Current.CancellationToken; var options = MediaSpoolTests.Settings();
+        options.Spool.BudgetBytes = 128 * 1024 * 1024;
+        await using var spool = MediaSpoolTests.Spool(options); await spool.StartAsync(ct);
+        using var codec = new SkiaImageCodec(spool, Options.Create(options));
+        using var bitmap = new SKBitmap(width, height); bitmap.Erase(new SKColor(10, 20, 30, 100));
+        using var image = SKImage.FromBitmap(bitmap); using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
+        await using var stream = encoded.AsStream();
+        await using var source = await spool.CaptureAsync(stream, encoded.Size, ct);
+        var result = await new PublicationImageRenderer(codec, spool).RenderAsync(source, "image/png", ct);
+        await using var content = result.Content; await using var input = content.OpenRead();
+        using var rendered = SKBitmap.Decode(input);
+        Assert.Equal(expectedWidth, rendered.Width); Assert.Equal(expectedHeight, rendered.Height); Assert.Equal(100, rendered.GetPixel(0, 0).Alpha);
+    }
+
     private static byte[] Image(SKEncodedImageFormat format)
     {
         using var bitmap = new SKBitmap(3, 2);

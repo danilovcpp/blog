@@ -23,7 +23,8 @@ public sealed class ConsumerWalkthroughTests(PostgresFixture postgres) : IClassF
 
         async Task<JsonElement> Call(HttpClient client, string operationId, object? body = null, Guid? id = null, Guid? version = null, string? slug = null)
         {
-            var endpoint = contract["paths"]!.AsObject().SelectMany(p => p.Value!.AsObject().Where(m => m.Value?["operationId"]?.GetValue<string>() == operationId)
+            var endpoint = contract["paths"]!.AsObject().SelectMany(p => p.Value!.AsObject().Where(m => m.Key is "get" or "post" or "put" or "delete")
+                .Where(m => m.Value?["operationId"]?.GetValue<string>() == operationId)
                 .Select(m => (Path: p.Key, Method: m.Key, Operation: m.Value!))).Single();
             var path = endpoint.Path.Replace("{id}", id?.ToString("D"), StringComparison.Ordinal)
                 .Replace("{commentId}", id?.ToString("D"), StringComparison.Ordinal).Replace("{slug}", slug, StringComparison.Ordinal);

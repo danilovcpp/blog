@@ -140,13 +140,14 @@ public sealed class RequestPlan
         void Demand(bool condition) { if (!condition) { throw new InvalidDataException("Unexpected benchmark response."); } }
         void Publication(JsonElement item, int n, bool detail)
         {
-            var allowed = new HashSet<string>(["id", "title", "slug", "description", "coverUrl", "author", "createdAt", "updatedAt", "firstPublishedAt", "categories", "tags", "likeCount", "viewCount", "isLikedByCurrentUser"]);
-            if (detail) { allowed.Add("markdown"); }
+            var allowed = new HashSet<string>(["id", "title", "slug", "description", "coverUrl", "coverFileId", "author", "createdAt", "updatedAt", "firstPublishedAt", "categories", "tags", "likeCount", "viewCount", "isLikedByCurrentUser"]);
+            if (detail) { allowed.UnionWith(["markdown", "inlineImages", "attachments"]); }
             Demand(item.EnumerateObject().All(p => allowed.Contains(p.Name)) && item.EnumerateObject().Count() == allowed.Count);
             Demand(item.GetProperty("id").GetGuid() == SeedDataset.Id("publication", n));
             Demand(item.GetProperty("title").GetString() == "Article " + n);
             Demand(item.GetProperty("slug").GetString() == "article-" + n);
             Demand(item.GetProperty("description").ValueKind == JsonValueKind.Null && item.GetProperty("coverUrl").ValueKind == JsonValueKind.Null);
+            Demand(item.GetProperty("coverFileId").ValueKind == JsonValueKind.Null);
             Demand(item.GetProperty("author").GetProperty("id").GetGuid() == SeedDataset.Id("user", dataset.Rank("authors", n) % 1000));
             foreach (var (field, expected) in new[] { ("createdAt", dataset.PublishedAt(n).AddDays(-1)), ("updatedAt", dataset.PublishedAt(n)), ("firstPublishedAt", dataset.PublishedAt(n)) })
             { Demand(item.GetProperty(field).GetDateTime() == expected && item.GetProperty(field).GetString()!.EndsWith('Z')); }
@@ -169,7 +170,10 @@ public sealed class RequestPlan
             Demand(item.GetProperty("isLikedByCurrentUser").GetBoolean() == (request.Template.Bearer && dataset.LikedBy(n, request.User)));
             Demand(!item.TryGetProperty("version", out _) && !item.TryGetProperty("state", out _));
             if (detail)
-            { Demand(item.GetProperty("markdown").GetString() == SeedDataset.Body("body", n, dataset.BodyBytes(n))); }
+            {
+                Demand(item.GetProperty("markdown").GetString() == SeedDataset.Body("body", n, dataset.BodyBytes(n)));
+                Demand(item.GetProperty("inlineImages").GetArrayLength() == 0 && item.GetProperty("attachments").GetArrayLength() == 0);
+            }
             else { Demand(!item.TryGetProperty("markdown", out _)); }
         }
         if (request.Publication is { } publication) { Publication(json, publication, true); return; }

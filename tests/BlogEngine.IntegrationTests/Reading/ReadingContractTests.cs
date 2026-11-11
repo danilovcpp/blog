@@ -13,7 +13,7 @@ namespace BlogEngine.IntegrationTests.Reading;
 [Trait("Category", "ConsumerContract")]
 public sealed class ReadingContractTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>
 {
-    internal static readonly string[] CardFields = ["id", "title", "slug", "description", "coverUrl", "author", "createdAt", "updatedAt", "firstPublishedAt", "categories", "tags", "likeCount", "viewCount", "isLikedByCurrentUser"];
+    internal static readonly string[] CardFields = ["id", "title", "slug", "description", "coverUrl", "coverFileId", "author", "createdAt", "updatedAt", "firstPublishedAt", "categories", "tags", "likeCount", "viewCount", "isLikedByCurrentUser"];
 
     [Fact]
     public async Task IndependentReadingKeepsDtosPersonalizationAndStoredCountersConsistent()
@@ -47,7 +47,7 @@ public sealed class ReadingContractTests(PostgresFixture postgres) : IClassFixtu
                 var detail = await GetAsync(client, path, ct);
                 var slug = await GetAsync(client, "/api/v1/publications/by-slug/reading-" + number, ct);
                 Assert.Equal(detail.GetRawText(), slug.GetRawText());
-                AssertFields(detail, [.. CardFields, "markdown"]);
+                AssertFields(detail, [.. CardFields, "markdown", "inlineImages", "attachments"]);
                 var counters = await GetAsync(client, path + "/counters", ct);
                 AssertFields(counters, ["likeCount", "viewCount", "isLikedByCurrentUser"]);
                 foreach (var field in new[] { "likeCount", "viewCount", "isLikedByCurrentUser" })

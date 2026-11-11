@@ -33,6 +33,14 @@ public static class MediaRegistration
         services.AddScoped<IMediaProcessingStore, MediaProcessingStore>();
         services.AddSingleton<IMediaProcessingLease, MediaProcessingLease>();
         services.AddScoped<IMediaUploadProcessor, AttachmentProcessing>();
+        services.AddScoped<IMediaUploadProcessor, PublicationImageProcessing>();
+        services.AddSingleton<IPublicationImageRenderer, PublicationImageRenderer>();
+        services.AddScoped<IPublicationImageStore, MediaProcessingStore>();
+        services.AddScoped<IPublicationMediaUsages, PublicationMediaUsages>();
+        services.AddScoped<IFileDeletionStore, FileDeletionStore>();
+        services.AddScoped<FileDeletion>();
+        services.AddScoped<PublicationImageQuery>();
+        services.AddScoped<PublicationMediaAccessQuery>();
         services.AddScoped<IMediaLibraryQuery, MediaLibraryQuery>();
         services.AddScoped<UploadLifecycle>();
         services.AddScoped<UploadContentService>();

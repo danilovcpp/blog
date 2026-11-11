@@ -38,7 +38,7 @@ public sealed class FullDatasetQueryTests(PostgresFixture postgres) : IClassFixt
                 var request = plan.Get(0, slot);
                 f.Anonymous.DefaultRequestHeaders.Authorization = request.Template.Bearer ? new("Bearer", f.Identity.CreateToken(SeedDataset.Id("subject", request.User))) : null;
                 capture.Clear(); var json = await JsonAsync(await f.Anonymous.GetAsync(request.Path, ct), HttpStatusCode.OK, ct); plan.ValidateResponse(request, json);
-                scenarios.Add(await InspectAsync(connection, capture, $"sc005/profile-{slot:D3}", request.Template.Kind == "feed" ? 5 : 3, request.Template.Size, manifest, ct));
+                scenarios.Add(await InspectAsync(connection, capture, $"sc005/profile-{slot:D3}", request.Template.Kind == "feed" ? 5 : 4, request.Template.Size, manifest, ct));
             }
             f.Anonymous.DefaultRequestHeaders.Authorization = null;
             var filters = new List<(string Name, int[] Categories, int[] Tags)> { ("none", [], []) };

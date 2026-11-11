@@ -29,4 +29,4 @@ public sealed record PublicationFeedRequest
 
 public sealed record PublicationFeed(Guid Id, string Title, string Slug, string? Description, string? CoverUrl, AuthorRef Author,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset FirstPublishedAt, IReadOnlyList<TaxonomyItem> Categories,
-    IReadOnlyList<TaxonomyItem> Tags, long LikeCount, long ViewCount, bool IsLikedByCurrentUser);
+    IReadOnlyList<TaxonomyItem> Tags, long LikeCount, long ViewCount, bool IsLikedByCurrentUser, Guid? CoverFileId = null);
