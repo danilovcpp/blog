@@ -18,6 +18,7 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
     public CapturedLogs Logs { get; } = new();
     public DatabaseClock? ViewClock { get; init; }
     public GarageFixture? MediaStorage { get; init; }
+    public IStartupFilter? MediaProbes { get; init; }
     public IReadOnlyDictionary<string, string> VisitorKeys { get; init; } = new Dictionary<string, string>
     { ["fixture"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) };
 
@@ -35,6 +36,11 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
                 ["Identity:AllowLocalHttp"] = "true",
                 ["AllowedHosts"] = "localhost;127.0.0.1",
                 ["AnonymousVisitors:ActiveKeyId"] = VisitorKeys.Keys.First(),
+                ["Media:Storage:Endpoint"] = "http://127.0.0.1:1",
+                ["Media:Storage:AllowLocalHttp"] = "true",
+                ["Media:Storage:AccessKey"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
+                ["Media:Storage:SecretKey"] = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),
+                ["Media:Spool:Directory"] = Path.Combine(Path.GetTempPath(), "blog-media-tests", Guid.NewGuid().ToString("N")),
             };
             foreach (var (id, secret) in VisitorKeys) { values["AnonymousVisitors:Keys:" + id] = secret; }
             if (MediaStorage is not null)
@@ -47,6 +53,7 @@ public sealed class ApiFactory(string connectionString, JwksFixture identity, Db
             services.AddSingleton<TimeProvider>(Time);
             if (ViewClock is not null) { services.AddSingleton(ViewClock); }
             services.AddSingleton<IStartupFilter, FoundationProbes>();
+            if (MediaProbes is not null) { services.AddSingleton(MediaProbes); }
         });
         builder.ConfigureLogging(logging => logging.AddProvider(Logs));
     }

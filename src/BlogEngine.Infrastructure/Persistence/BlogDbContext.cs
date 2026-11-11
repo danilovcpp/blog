@@ -1,10 +1,12 @@
 using BlogEngine.Core.Accounts.Domain;
 using BlogEngine.Core.Discussions.Domain;
 using BlogEngine.Core.Engagement.Domain;
+using BlogEngine.Core.Media.Domain;
 using BlogEngine.Core.Publishing.Domain;
 using BlogEngine.Infrastructure.Persistence.Accounts;
 using BlogEngine.Infrastructure.Persistence.Discussions;
 using BlogEngine.Infrastructure.Persistence.Engagement;
+using BlogEngine.Infrastructure.Persistence.Media;
 using BlogEngine.Infrastructure.Persistence.Publishing;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +25,14 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
     public DbSet<Like> Likes => Set<Like>();
     public DbSet<ViewDeduplicationRecord> ViewDeduplicationRecords => Set<ViewDeduplicationRecord>();
     public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
+    public DbSet<MediaUpload> MediaUploads => Set<MediaUpload>();
+    public DbSet<StorageAllowance> StorageAllowances => Set<StorageAllowance>();
+    public DbSet<AvatarState> AvatarStates => Set<AvatarState>();
+    public DbSet<PublicationUsage> PublicationUsages => Set<PublicationUsage>();
+    public DbSet<MediaObject> MediaObjects => Set<MediaObject>();
+    public DbSet<MediaRepresentation> MediaRepresentations => Set<MediaRepresentation>();
+    public DbSet<MediaCleanupJob> MediaCleanupJobs => Set<MediaCleanupJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,5 +47,6 @@ public sealed class BlogDbContext(DbContextOptions<BlogDbContext> options) : DbC
         modelBuilder.ApplyConfiguration(new LikeConfiguration());
         modelBuilder.ApplyConfiguration(new ViewDeduplicationConfiguration());
         modelBuilder.ApplyConfiguration(new CommentConfiguration());
+        MediaConfiguration.Configure(modelBuilder);
     }
 }

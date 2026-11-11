@@ -35,3 +35,6 @@ Dockerfile*
 **/*.pfx
 **/*.p12
 **/Dockerfile*
+mockups/
+**/dist/
+**/build/

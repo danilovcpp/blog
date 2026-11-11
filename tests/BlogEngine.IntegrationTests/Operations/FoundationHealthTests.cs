@@ -113,6 +113,8 @@ public sealed class FoundationHealthTests(PostgresFixture postgres) : IClassFixt
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Identity:JwksUrl"] = "https://keys.invalid/jwks.json",
+                ["Media:Storage:Endpoint"] = "https://storage.fixture.invalid",
+                ["Media:Storage:AllowLocalHttp"] = "false",
             })));
         using var client = production.CreateClient();
         using var live = await client.GetAsync("/health/live", TestContext.Current.CancellationToken);

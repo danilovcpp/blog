@@ -31,6 +31,7 @@ public static class ApiRegistration
     public static void AddBlogEngine(this WebApplicationBuilder builder)
     {
         var services = builder.Services;
+        builder.AddMedia();
         services.AddSingleton(TimeProvider.System);
         services.AddHttpContextAccessor();
         services.AddOptions<IdentityOptions>().BindConfiguration("Identity").ValidateOnStart();

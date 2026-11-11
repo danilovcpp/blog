@@ -23,7 +23,8 @@ public sealed class ViewMigrationTests(PostgresFixture postgres) : IClassFixture
         var pub = await PublishedAsync(author, "view-migrations", ct); var id = pub.GetProperty("id").GetGuid();
         await JsonAsync(await ViewAsync(author, id, null, ct), HttpStatusCode.OK, ct);
         await using var db = BootstrapTests.Context(f.Database.ConnectionString); var migrator = db.GetService<IMigrator>();
-        var migrations = db.Database.GetMigrations().ToArray(); await migrator.MigrateAsync(migrations[^2], ct);
+        // Name the migration under test; a newer additive migration must not change this rehearsal.
+        await migrator.MigrateAsync("20261024063201_AddDiscussions", ct);
         Assert.Equal(1, (await db.Publications.AsNoTracking().SingleAsync(ct)).ViewCount);
         await db.Database.MigrateAsync(ct); Assert.Equal(0, await db.ViewDeduplicationRecords.CountAsync(ct));
         var script = migrator.GenerateScript(options: MigrationsSqlGenerationOptions.Idempotent);

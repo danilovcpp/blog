@@ -11,16 +11,18 @@ public sealed class DependencyTests
     {
         var assembly = typeof(CurrentActor).Assembly;
         Assert.DoesNotContain(assembly.GetReferencedAssemblies(), reference =>
-            new[] { "Microsoft.AspNetCore", "Microsoft.EntityFrameworkCore", "Npgsql", "Microsoft.IdentityModel" }
+            new[] { "Microsoft.AspNetCore", "Microsoft.EntityFrameworkCore", "Npgsql", "Microsoft.IdentityModel", "AWSSDK", "SkiaSharp", "System.Net.Http" }
                 .Any(prefix => reference.Name!.StartsWith(prefix, StringComparison.Ordinal)));
-        var modules = new[] { "Accounts", "Publishing", "Discussions", "Engagement", "ReadModels" };
+        Assert.Contains(assembly.GetTypes(), type => type.Namespace == "BlogEngine.Core.Media.Domain");
+        var modules = new[] { "Accounts", "Publishing", "Discussions", "Engagement", "ReadModels", "Media" };
         var allowed = new Dictionary<string, string[]>
         {
             ["Accounts"] = [],
-            ["Publishing"] = ["Accounts"],
-            ["Discussions"] = ["Accounts", "Publishing"],
+            ["Publishing"] = ["Accounts", "Media"],
+            ["Discussions"] = ["Accounts", "Publishing", "Media"],
             ["Engagement"] = ["Accounts", "Publishing"],
-            ["ReadModels"] = ["Accounts", "Publishing", "Discussions", "Engagement"],
+            ["ReadModels"] = ["Accounts", "Publishing", "Discussions", "Engagement", "Media"],
+            ["Media"] = ["Accounts"],
         };
         foreach (var type in assembly.GetTypes())
         {
@@ -30,7 +32,9 @@ public sealed class DependencyTests
                 .Select(field => field.FieldType)
                 .Concat(type.GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                     .SelectMany(method => method.GetParameters().Select(parameter => parameter.ParameterType).Append(method.ReturnType)))
-                .Concat(type.GetInterfaces()).Concat(BodyReferences(type));
+                .Concat(type.GetInterfaces()).Concat(type.BaseType is { } parent ? [parent] : [])
+                .Concat(type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).Select(p => p.PropertyType))
+                .Concat(BodyReferences(type));
             foreach (var reference in references.SelectMany(Expand))
             {
                 var other = Module(reference);

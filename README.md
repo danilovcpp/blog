@@ -141,7 +141,7 @@ DbContext получают разные PostgreSQL connections. Pool закры�
 ### Границы проектов
 
 - `Core` — независимые Domain/Application/Contracts модулей Accounts, Publishing,
-  Discussions, Engagement и ReadModels; каталоги каркаса перечислены в `.csproj`.
+  Discussions, Engagement, Media и ReadModels.
 - `Infrastructure` → `Core`: EF Core/Npgsql, Identity и другие внешние механизмы.
 - `Api` и `Operator` → `Core` + `Infrastructure`: отдельные HTTP/console hosts.
 - `UnitTests` работают без сети/БД; тестируют синхронизацию и управляемые часы
@@ -191,6 +191,9 @@ Development, с разными `UserSecretsId` у hosts.
 | API, CORS | `Api:AllowedOrigins` (явный allowlist) |
 | API, учёт просмотров (обязательно) | `AnonymousVisitors:ActiveKeyId`, `AnonymousVisitors:Keys:<keyId>` |
 | API, публичный host | `AllowedHosts` (по умолчанию только localhost/127.0.0.1) |
+| API, Media storage (обязательно) | `Media:Storage:Endpoint`, `Media:Storage:AccessKey`, `Media:Storage:SecretKey`; разные `OriginalsBucket`/`RenditionsBucket` |
+| API, Media spool (обязательно) | `Media:Spool:Directory` — абсолютный путь отдельного приватного постоянного тома вне webroot |
+| API, локальный Garage HTTP | `Media:Storage:AllowLocalHttp=true` только в Development для local/private endpoint |
 | Operator | `ConnectionStrings:Blog`, `Identity:Issuer` |
 | Миграционный процесс | Отдельный DDL connection string из защищённой конфигурации |
 
@@ -199,6 +202,11 @@ Development, с разными `UserSecretsId` у hosts.
 использует HTTPS. Visitor HMAC key ring не является RSA-ключом Identity.
 Обязательные параметры соответствующего host, включая visitor key ring API, проверяются при запуске.
 Не указывайте секреты в исходниках, Git, логах, истории shell или отчётах.
+
+Phase 2 файлов добавляет общую инфраструктуру Media и миграцию `AddMedia`.
+Upload/library/avatar endpoints появятся в последующих фазах. Настройки,
+границы текущей реализации и результаты проверок — в
+[отчёте Phase 2](specs/002-files-avatars/phase2-report.md).
 
 ### Изолированные фикстуры
 

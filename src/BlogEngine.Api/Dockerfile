@@ -5,10 +5,21 @@ COPY . .
 RUN dotnet restore src/BlogEngine.Api/BlogEngine.Api.csproj --locked-mode \
     && dotnet publish src/BlogEngine.Api/BlogEngine.Api.csproj -c Release --no-restore --self-contained false -p:UseAppHost=false -o /app -warnaserror
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.13@sha256:f879b8a9cb3f6694b8b0c9fa530eb0c39d8920db09c05a7edbd6c4c6c104ae1b
+FROM build AS codec-test-build
+RUN dotnet restore tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj --locked-mode \
+    && dotnet build tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj -c Release --no-restore -warnaserror
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13@sha256:f879b8a9cb3f6694b8b0c9fa530eb0c39d8920db09c05a7edbd6c4c6c104ae1b AS runtime
 WORKDIR /app
-COPY --from=build /app .
 ENV ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTP_PORTS=8080 DOTNET_EnableDiagnostics=0
 USER $APP_UID
+
+FROM runtime AS media-codec-validation
+COPY --from=codec-test-build /source/tests/BlogEngine.IntegrationTests/bin/Release/net10.0 .
+ENTRYPOINT ["dotnet", "BlogEngine.IntegrationTests.dll", "-class", "BlogEngine.IntegrationTests.Media.ImageCodecTests"]
+
+FROM runtime AS final
+WORKDIR /app
+COPY --from=build /app .
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "BlogEngine.Api.dll"]

@@ -286,6 +286,589 @@ namespace BlogEngine.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.AvatarState", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid?>("CurrentFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_file_id");
+
+                    b.Property<short?>("RequiredPurpose")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_purpose")
+                        .HasComputedColumnSql("2::smallint", true);
+
+                    b.Property<short?>("RequiredState")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_state")
+                        .HasComputedColumnSql("1::smallint", true);
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_avatar_states");
+
+                    b.HasIndex("CurrentFileId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_avatar_states_current")
+                        .HasFilter("current_file_id IS NOT NULL");
+
+                    b.ToTable("avatar_states", "media");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.MediaCleanupJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<string>("ErrorCode")
+                        .HasColumnType("text")
+                        .HasColumnName("error_code");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("bigint")
+                        .HasColumnName("generation");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<DateTimeOffset>("NotBefore")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("not_before");
+
+                    b.Property<Guid>("ObjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("object_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cleanup_jobs");
+
+                    b.HasIndex("ObjectId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_cleanup_jobs_object");
+
+                    b.HasIndex("NextAttemptAt", "Id")
+                        .HasDatabaseName("ix_cleanup_jobs_due")
+                        .HasFilter("completed_at IS NULL");
+
+                    b.ToTable("cleanup_jobs", "media", t =>
+                        {
+                            t.HasCheckConstraint("ck_cleanup_jobs_values", "attempts>=0 AND generation>=0 AND due_at>=not_before AND next_attempt_at>=not_before");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.MediaFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeclaredContentType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("declared_content_type");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("OriginalName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("original_name");
+
+                    b.Property<Guid?>("OriginalObjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("original_object_id");
+
+                    b.Property<long>("OriginalSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("original_size");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<short>("Purpose")
+                        .HasColumnType("smallint")
+                        .HasColumnName("purpose");
+
+                    b.Property<DateTimeOffset?>("ReadyAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ready_at");
+
+                    b.Property<short?>("RequiredAvatar256Kind")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_avatar256_kind")
+                        .HasComputedColumnSql("CASE WHEN state=1 AND purpose=2 THEN 2::smallint END", true);
+
+                    b.Property<short?>("RequiredAvatar512Kind")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_avatar512_kind")
+                        .HasComputedColumnSql("CASE WHEN state=1 AND purpose=2 THEN 3::smallint END", true);
+
+                    b.Property<short?>("RequiredDisplayKind")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_display_kind")
+                        .HasComputedColumnSql("CASE WHEN state=1 AND purpose=1 THEN 1::smallint END", true);
+
+                    b.Property<short?>("RequiredSourceKind")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_source_kind")
+                        .HasComputedColumnSql("0::smallint", true);
+
+                    b.Property<short?>("RequiredSourceState")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_source_state")
+                        .HasComputedColumnSql("1::smallint", true);
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<string>("VerifiedContentType")
+                        .HasColumnType("text")
+                        .HasColumnName("verified_content_type");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_files");
+
+                    b.HasIndex("Id", "OwnerId", "Purpose")
+                        .IsUnique()
+                        .HasDatabaseName("uq_files_owner_purpose");
+
+                    b.HasIndex("OwnerId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_files_library")
+                        .HasFilter("state=1 AND purpose IN (0,1)");
+
+                    b.HasIndex("Id", "OwnerId", "Purpose", "State")
+                        .IsUnique()
+                        .HasDatabaseName("uq_files_owner_purpose_state");
+
+                    b.ToTable("files", "media", t =>
+                        {
+                            t.HasCheckConstraint("ck_files_content_type", "declared_content_type ~ '^[a-z0-9!#$%&''*+.^_`|~-]+/[a-z0-9!#$%&''*+.^_`|~-]+$' AND (purpose=0 OR declared_content_type IN ('image/jpeg','image/png','image/webp')) AND (verified_content_type IS NULL OR (purpose=0 OR verified_content_type IN ('image/jpeg','image/png','image/webp')))");
+
+                            t.HasCheckConstraint("ck_files_name", "original_name = btrim(original_name, U&'\\0009\\000a\\000b\\000c\\000d\\0020\\0085\\00a0\\1680\\2000\\2001\\2002\\2003\\2004\\2005\\2006\\2007\\2008\\2009\\200a\\2028\\2029\\202f\\205f\\3000') AND char_length(original_name) BETWEEN 1 AND 255 AND original_name NOT IN ('.','..') AND original_name !~ '^[a-zA-Z]:' AND position('/' in original_name)=0 AND position(chr(92) in original_name)=0 AND original_name !~ '[[:cntrl:]]' AND original_name !~ U&'[\\0080-\\009f]'");
+
+                            t.HasCheckConstraint("ck_files_purpose", "purpose IN (0,1,2)");
+
+                            t.HasCheckConstraint("ck_files_size", "original_size > 0 AND original_size <= CASE purpose WHEN 0 THEN 52428800 WHEN 1 THEN 10485760 WHEN 2 THEN 5242880 ELSE 0 END");
+
+                            t.HasCheckConstraint("ck_files_state", "(state=0 AND ready_at IS NULL AND deleted_at IS NULL AND original_object_id IS NULL AND verified_content_type IS NULL) OR (state=1 AND ready_at IS NOT NULL AND deleted_at IS NULL AND verified_content_type IS NOT NULL AND ((purpose IN (0,1) AND original_object_id IS NOT NULL) OR (purpose=2 AND original_object_id IS NULL))) OR (state=2 AND deleted_at IS NOT NULL AND original_object_id IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.MediaObject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AttemptGeneration")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempt_generation");
+
+                    b.Property<short>("BucketKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("bucket_kind");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("bigint")
+                        .HasColumnName("generation");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("LastReconciledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_reconciled_at");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<DateTimeOffset>("NextReconcileAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_reconcile_at");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<byte[]>("Sha256")
+                        .HasColumnType("bytea")
+                        .HasColumnName("sha256");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("UploadId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("upload_id");
+
+                    b.Property<long?>("VerifiedLength")
+                        .HasColumnType("bigint")
+                        .HasColumnName("verified_length");
+
+                    b.HasKey("Id")
+                        .HasName("pk_objects");
+
+                    b.HasIndex("BucketKind", "ObjectKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_objects_key");
+
+                    b.HasIndex("NextReconcileAt", "Id")
+                        .HasDatabaseName("ix_objects_reconcile")
+                        .HasFilter("state IN (2,3)");
+
+                    b.HasIndex("Id", "FileId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("uq_objects_file_kind");
+
+                    b.HasIndex("Id", "FileId", "Kind", "State")
+                        .IsUnique()
+                        .HasDatabaseName("uq_objects_file_kind_state");
+
+                    b.ToTable("objects", "media", t =>
+                        {
+                            t.HasCheckConstraint("ck_objects_kind_bucket", "(kind=0 AND bucket_kind=0) OR (kind IN (1,2,3) AND bucket_kind=1)");
+
+                            t.HasCheckConstraint("ck_objects_state", "state IN (0,1,2,3) AND (state<>1 OR (verified_length>0 AND verified_length IS NOT NULL AND octet_length(sha256)=32 AND sha256 IS NOT NULL)) AND ((state IN (0,1) AND retired_at IS NULL) OR (state IN (2,3) AND retired_at IS NOT NULL))");
+
+                            t.HasCheckConstraint("ck_objects_values", "char_length(object_key) BETWEEN 1 AND 1024 AND attempt_generation>=0 AND generation>=0 AND (sha256 IS NULL OR octet_length(sha256)=32) AND (verified_length IS NULL OR verified_length>0)");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.MediaRepresentation", b =>
+                {
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<string>("Mime")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("mime");
+
+                    b.Property<Guid>("ObjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("object_id");
+
+                    b.Property<short?>("RequiredState")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_state")
+                        .HasComputedColumnSql("1::smallint", true);
+
+                    b.Property<byte[]>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("VerifiedLength")
+                        .HasColumnType("bigint")
+                        .HasColumnName("verified_length");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("FileId", "Kind")
+                        .HasName("pk_representations");
+
+                    b.HasIndex("ObjectId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_representations_object");
+
+                    b.ToTable("representations", "media", t =>
+                        {
+                            t.HasCheckConstraint("ck_representations_content", "mime='image/png' AND verified_length>0 AND octet_length(sha256)=32");
+
+                            t.HasCheckConstraint("ck_representations_dimensions", "width>0 AND height>0 AND ((kind=1 AND width<=2560 AND height<=2560) OR (kind=2 AND width=256 AND height=256) OR (kind=3 AND width=512 AND height=512))");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.MediaUpload", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("ActualSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("actual_size");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<byte[]>("ContentSha256")
+                        .HasColumnType("bytea")
+                        .HasColumnName("content_sha256");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CurrentObjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_object_id");
+
+                    b.Property<string>("ErrorCode")
+                        .HasColumnType("text")
+                        .HasColumnName("error_code");
+
+                    b.Property<Guid?>("ExpectedAvatarVersion")
+                        .HasColumnType("uuid")
+                        .HasColumnName("expected_avatar_version");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<long>("LeaseGeneration")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lease_generation");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<short>("Purpose")
+                        .HasColumnType("smallint")
+                        .HasColumnName("purpose");
+
+                    b.Property<byte[]>("RequestFingerprint")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("request_fingerprint");
+
+                    b.Property<short?>("RequiredSourceKind")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_source_kind")
+                        .HasComputedColumnSql("0::smallint", true);
+
+                    b.Property<long>("ReservedBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reserved_bytes");
+
+                    b.Property<string>("Result")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_uploads");
+
+                    b.HasIndex("FileId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_uploads_file");
+
+                    b.HasIndex("ExpiresAt", "Id")
+                        .HasDatabaseName("ix_uploads_expiry")
+                        .HasFilter("state IN (0,1,2)");
+
+                    b.HasIndex("Id", "FileId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_uploads_id_file");
+
+                    b.HasIndex("NextAttemptAt", "Id")
+                        .HasDatabaseName("ix_uploads_processing")
+                        .HasFilter("state=2");
+
+                    b.HasIndex("OwnerId", "ExpiresAt")
+                        .HasDatabaseName("ix_uploads_reserves")
+                        .HasFilter("state IN (0,1,2)");
+
+                    b.HasIndex("OwnerId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_uploads_owner_key");
+
+                    b.ToTable("uploads", "media", t =>
+                        {
+                            t.HasCheckConstraint("ck_uploads_content", "reserved_bytes>0 AND ((current_object_id IS NULL AND actual_size IS NULL AND content_sha256 IS NULL) OR (current_object_id IS NOT NULL AND actual_size=reserved_bytes AND octet_length(content_sha256)=32 AND content_sha256 IS NOT NULL)) AND (state NOT IN (1,2,3) OR current_object_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_uploads_expiry", "expires_at=created_at+interval '24 hours'");
+
+                            t.HasCheckConstraint("ck_uploads_fingerprint", "octet_length(request_fingerprint)=32");
+
+                            t.HasCheckConstraint("ck_uploads_lease", "lease_generation>=0 AND attempts>=0");
+
+                            t.HasCheckConstraint("ck_uploads_purpose", "purpose IN (0,1,2) AND ((purpose=2 AND expected_avatar_version IS NOT NULL) OR (purpose<>2 AND expected_avatar_version IS NULL))");
+
+                            t.HasCheckConstraint("ck_uploads_state", "state BETWEEN 0 AND 6 AND ((state=3 AND result IS NOT NULL AND error_code IS NULL) OR (state IN (4,5,6) AND result IS NULL AND error_code IS NOT NULL) OR (state IN (0,1,2) AND result IS NULL AND error_code IS NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.PublicationUsage", b =>
+                {
+                    b.Property<Guid>("PublicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publication_id");
+
+                    b.Property<short>("Role")
+                        .HasColumnType("smallint")
+                        .HasColumnName("role");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("PublicationOwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("publication_owner_id");
+
+                    b.Property<short?>("RequiredPurpose")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_purpose")
+                        .HasComputedColumnSql("CASE WHEN role=2 THEN 0::smallint ELSE 1::smallint END", true);
+
+                    b.Property<short?>("RequiredState")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("smallint")
+                        .HasColumnName("required_state")
+                        .HasComputedColumnSql("1::smallint", true);
+
+                    b.HasKey("PublicationId", "Role", "FileId")
+                        .HasName("pk_publication_usages");
+
+                    b.HasIndex("FileId")
+                        .HasDatabaseName("ix_usages_file");
+
+                    b.HasIndex("PublicationId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_usages_cover")
+                        .HasFilter("role=0");
+
+                    b.HasIndex("PublicationId", "Role", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("uq_usages_position");
+
+                    b.ToTable("publication_usages", "media", t =>
+                        {
+                            t.HasCheckConstraint("ck_usages_role_position", "role IN (0,1,2) AND position>=0");
+                        });
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.StorageAllowance", b =>
+                {
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<long>("LimitBytes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1073741824L)
+                        .HasColumnName("limit_bytes");
+
+                    b.Property<long>("UsedBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("used_bytes");
+
+                    b.HasKey("OwnerId")
+                        .HasName("pk_allowances");
+
+                    b.ToTable("allowances", "media", t =>
+                        {
+                            t.HasCheckConstraint("ck_allowances_bytes", "limit_bytes>0 AND used_bytes>=0 AND used_bytes<=limit_bytes");
+                        });
+                });
+
             modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -406,6 +989,10 @@ namespace BlogEngine.Infrastructure.Persistence.Migrations
                         .IsDescending()
                         .HasDatabaseName("ix_publications_recent")
                         .HasFilter("state = 1 AND deleted_at IS NULL");
+
+                    b.HasIndex("Id", "AuthorId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_publications_owner");
 
                     b.HasIndex("UpdatedAt", "Id")
                         .IsDescending()
@@ -588,6 +1175,46 @@ namespace BlogEngine.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_view_deduplication_publications");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.AvatarState", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Accounts.Domain.LocalUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_avatar_states_owner");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.MediaCleanupJob", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Media.Domain.MediaObject", null)
+                        .WithMany()
+                        .HasForeignKey("ObjectId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_cleanup_jobs_object");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.MediaFile", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Accounts.Domain.LocalUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_files_owner");
+                });
+
+            modelBuilder.Entity("BlogEngine.Core.Media.Domain.StorageAllowance", b =>
+                {
+                    b.HasOne("BlogEngine.Core.Accounts.Domain.LocalUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_allowances_owner");
                 });
 
             modelBuilder.Entity("BlogEngine.Core.Publishing.Domain.Publication", b =>

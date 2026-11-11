@@ -1,8 +1,19 @@
 # Media storage setup
 
-Phase 1 supplies storage/provisioning and the integration harness. The API does
-not yet register the Media module or expose upload routes. Provisioning is an
-operator step, never an API startup action.
+Phase 1 supplies storage/provisioning and the integration harness. Phase 2
+registers Media options, spool, S3/codec and transaction/transport primitives.
+Upload routes are scheduled for Phase 3. Provisioning remains an operator step,
+never an API startup action. Apply `AddMedia` and rerun database permissions
+using the separate provisioner; the API and Operator receive no DDL rights.
+
+API startup now requires the runtime S3 credential pair, trusted endpoint and
+an absolute `Media__Spool__Directory` outside webroot. Each API host needs its
+own private persistent spool volume. Defaults reserve a 1 GiB disk budget and
+share four transfer slots. The process exclusively owns and reclaims its spool
+before accepting transfers; ownership/cleanup failure leaves readiness false.
+Local/private HTTP needs `Media__Storage__AllowLocalHttp=true` in Development;
+Production requires HTTPS. See [the Phase 2 report](../../specs/002-files-avatars/phase2-report.md)
+for verification and remaining feature work.
 
 ## Development
 

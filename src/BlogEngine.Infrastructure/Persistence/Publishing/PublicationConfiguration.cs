@@ -32,6 +32,7 @@ public sealed class PublicationConfiguration : IEntityTypeConfiguration<Publicat
         b.Property(p => p.Version).IsConcurrencyToken().ValueGeneratedNever();
         b.Property(p => p.LikeCount).HasDefaultValue(0L); b.Property(p => p.ViewCount).HasDefaultValue(0L);
         b.HasIndex(p => p.Slug).IsUnique().HasDatabaseName("uq_publications_slug");
+        b.HasIndex(p => new { p.Id, p.AuthorId }).IsUnique().HasDatabaseName("uq_publications_owner");
         b.HasOne<LocalUser>().WithMany().HasForeignKey(p => p.AuthorId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_publications_local_users");
         b.HasIndex(p => new { p.FirstPublishedAt, p.Id }).IsDescending().HasFilter("state = 1 AND deleted_at IS NULL").HasDatabaseName("ix_publications_recent");
         b.HasIndex(p => new { p.LikeCount, p.FirstPublishedAt, p.Id }).IsDescending().HasFilter("state = 1 AND deleted_at IS NULL").HasDatabaseName("ix_publications_popular");

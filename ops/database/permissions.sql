@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- Run with psql as the database provisioner after AddViewDeduplication. All four principals must already exist.
+-- Run with psql as the database provisioner after the latest migration. All four principals must already exist.
 -- Pass identifier variables owner_role, migration_role, runtime_role, operator_role. Never pass passwords here.
 BEGIN;
 SELECT format('REVOKE CREATE, TEMP ON DATABASE %I FROM PUBLIC', current_database()) \gexec
@@ -36,6 +36,17 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON engagement.view_deduplication_records TO
 -- Comments are terminal tombstones; runtime never physically deletes a node.
 GRANT SELECT, INSERT, UPDATE ON discussions.comments TO :"runtime_role";
 -- New objects receive no implicit runtime/operator grants. Extend this file with the owning migration.
+-- The conditional preserves the deployment path that applies MVP grants before AddMedia.
+SELECT 'ALTER SCHEMA media OWNER TO ' || quote_ident(:'owner_role') WHERE to_regnamespace('media') IS NOT NULL \gexec
+SELECT format('ALTER TABLE %I.%I OWNER TO %I', schemaname, tablename, :'owner_role')
+FROM pg_tables WHERE schemaname='media' \gexec
+SELECT format('REVOKE ALL ON SCHEMA media FROM PUBLIC, %I, %I', :'runtime_role', :'operator_role') WHERE to_regnamespace('media') IS NOT NULL \gexec
+SELECT format('REVOKE ALL ON ALL TABLES IN SCHEMA media FROM PUBLIC, %I, %I', :'runtime_role', :'operator_role') WHERE to_regnamespace('media') IS NOT NULL \gexec
+SELECT format('GRANT USAGE ON SCHEMA media TO %I', :'runtime_role') WHERE to_regnamespace('media') IS NOT NULL \gexec
+SELECT format('GRANT SELECT, INSERT, UPDATE ON media.files, media.uploads, media.allowances, media.avatar_states, media.objects, media.cleanup_jobs TO %I', :'runtime_role') WHERE to_regclass('media.schema_version') IS NOT NULL \gexec
+SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON media.publication_usages, media.representations TO %I', :'runtime_role') WHERE to_regclass('media.schema_version') IS NOT NULL \gexec
+SELECT format('GRANT SELECT ON media.schema_version TO %I', :'runtime_role') WHERE to_regclass('media.schema_version') IS NOT NULL \gexec
+SELECT format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA media REVOKE ALL ON TABLES FROM PUBLIC', :'owner_role') WHERE to_regnamespace('media') IS NOT NULL \gexec
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner_role" IN SCHEMA accounts REVOKE ALL ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE :"owner_role" IN SCHEMA publishing, engagement, discussions REVOKE ALL ON TABLES FROM PUBLIC;
 COMMIT;

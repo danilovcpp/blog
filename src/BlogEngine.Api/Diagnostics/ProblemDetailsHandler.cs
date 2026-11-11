@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using BlogEngine.Core.Media.Contracts;
 using BlogEngine.Core.Shared;
 using BlogEngine.Infrastructure.Identity;
 using BlogEngine.Infrastructure.Persistence;
@@ -25,7 +26,7 @@ public sealed class ProblemDetailsHandler(RequestDelegate next, ILogger<ProblemD
         }
         catch (Exception exception) when (!context.Response.HasStarted)
         {
-            var error = exception as DomainError ?? DatabaseErrorMapper.Map(exception);
+            var error = exception as DomainError ?? (exception is MediaStorageException ? new DomainError("media_storage_unavailable") : DatabaseErrorMapper.Map(exception));
             var status = error is not null ? StatusFor(error.Code) : exception switch
             {
                 IdentityKeysUnavailableException => 503,
@@ -33,7 +34,13 @@ public sealed class ProblemDetailsHandler(RequestDelegate next, ILogger<ProblemD
                 JsonException => 400,
                 _ => 500,
             };
-            var code = error?.Code ?? (exception is IdentityKeysUnavailableException ? "identity_keys_unavailable" : CodeFor(status));
+            var code = error?.Code switch
+            {
+                "media_storage_unavailable" or "media_capacity_unavailable" => "dependency_unavailable",
+                "upload_expired" => "invalid_state",
+                { } domainCode => domainCode,
+                _ => exception is IdentityKeysUnavailableException ? "identity_keys_unavailable" : CodeFor(status),
+            };
             if (status == 500)
             {
                 // Deliberately omit exception/message/stack: arbitrary exceptions can embed input or credentials.
@@ -48,6 +55,7 @@ public sealed class ProblemDetailsHandler(RequestDelegate next, ILogger<ProblemD
     public static async Task WriteAsync(HttpContext context, int status, string code, string? field = null)
     {
         context.Response.StatusCode = status;
+        if (status == 503) { context.Response.Headers.RetryAfter = "5"; }
         if (status == 401) { context.Response.Headers.WWWAuthenticate = "Bearer"; }
         var problem = new ProblemDetails
         {
@@ -68,10 +76,11 @@ public sealed class ProblemDetailsHandler(RequestDelegate next, ILogger<ProblemD
         "authentication_required" or "invalid_token" => 401,
         "forbidden" => 403,
         "resource_not_found" => 404,
-        "concurrency_conflict" or "slug_conflict" or "taxonomy_in_use" or "invalid_state" => 409,
+        "concurrency_conflict" or "slug_conflict" or "taxonomy_in_use" or "invalid_state" or "upload_in_progress" or
+            "idempotency_conflict" or "content_conflict" or "file_in_use" or "quota_exceeded" or "upload_expired" => 409,
         "request_too_large" => 413,
         "unsupported_media_type" => 415,
-        "dependency_unavailable" or "identity_keys_unavailable" => 503,
+        "dependency_unavailable" or "identity_keys_unavailable" or "media_capacity_unavailable" or "media_storage_unavailable" => 503,
         _ => 500,
     };
 

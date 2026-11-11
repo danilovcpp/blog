@@ -202,13 +202,21 @@ public sealed class SeedDataset
         }
         await using (var inventory = new NpgsqlCommand("SELECT schemaname||'.'||tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY 1", connection))
         {
-            var allowed = Tables().Select(t => t.Name).Append("public.__EFMigrationsHistory").ToHashSet(StringComparer.Ordinal);
+            var allowed = Tables().Select(t => t.Name).Concat(EmptyMediaTables).Append("media.schema_version").Append("public.__EFMigrationsHistory").ToHashSet(StringComparer.Ordinal);
             await using var reader = await inventory.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             { if (!allowed.Contains(reader.GetString(0))) { throw new InvalidOperationException("An unknown table prevents seeding this database."); } }
         }
         await using var transaction = await connection.BeginTransactionAsync(ct);
         await using (var guard = new NpgsqlCommand("SELECT pg_advisory_xact_lock(20261024)", connection, transaction)) { await guard.ExecuteNonQueryAsync(ct); }
+        // The MVP corpus has no Media rows. Permit the additive schema without accepting user data.
+        foreach (var table in EmptyMediaTables)
+        {
+            await using var exists = new NpgsqlCommand($"SELECT EXISTS(SELECT 1 FROM {table})", connection, transaction);
+            if ((bool)(await exists.ExecuteScalarAsync(ct))!) { throw new InvalidOperationException("Media must be empty before seeding the MVP benchmark corpus."); }
+        }
+        await using (var marker = new NpgsqlCommand("SELECT count(*)=1 AND min(version)=1 FROM media.schema_version", connection, transaction))
+        { if (!(bool)(await marker.ExecuteScalarAsync(ct))!) { throw new InvalidOperationException("The Media schema marker is incompatible with the seed."); } }
         var manifestPath = Path.Combine(output, "seed-manifest.json");
         var populated = false;
         foreach (var table in Tables())
@@ -248,6 +256,7 @@ public sealed class SeedDataset
         await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(manifest, BenchmarkManifest.Json), ct);
         return manifest;
     }
+    private static readonly string[] EmptyMediaTables = ["media.files", "media.uploads", "media.allowances", "media.avatar_states", "media.publication_usages", "media.objects", "media.representations", "media.cleanup_jobs"];
     public JsonElement VerifyDistribution()
     {
         var categories = new int[200]; var tags = new int[2000]; var sizes = new Dictionary<int, int>(); var authors = new int[1000];

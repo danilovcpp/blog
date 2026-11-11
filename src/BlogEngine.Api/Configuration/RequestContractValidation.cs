@@ -13,15 +13,18 @@ public sealed class RequestContractValidation(RequestDelegate next)
         var endpoint = context.GetEndpoint();
         if (endpoint is not null)
         {
+            var binary = endpoint.Metadata.GetMetadata<BinaryEndpoint>();
             IList<MediaTypeHeaderValue>? accept;
             try { accept = context.Request.GetTypedHeaders().Accept; }
             catch (FormatException) { throw new BadHttpRequestException("Invalid Accept header."); }
             if (accept is { Count: > 0 } && !accept.Any(value => value.Quality.GetValueOrDefault(1) > 0 &&
-                (new MediaTypeHeaderValue("application/json").IsSubsetOf(value) || new MediaTypeHeaderValue("application/problem+json").IsSubsetOf(value))))
+                (new MediaTypeHeaderValue(binary?.ContentType ?? "application/json").IsSubsetOf(value) || new MediaTypeHeaderValue("application/problem+json").IsSubsetOf(value))))
             {
                 await ProblemDetailsHandler.WriteAsync(context, 406, "not_acceptable");
                 return;
             }
+            // Raw PUT is counted by the spool after resource authorization and claim. Never buffer it as JSON.
+            if (binary?.RawUpload == true) { await next(context); return; }
             if (context.Request.ContentLength > MaximumBodyBytes)
             {
                 await ProblemDetailsHandler.WriteAsync(context, 413, "request_too_large");

@@ -19,7 +19,12 @@ public sealed class RuntimeOperationsTests(PostgresFixture postgres) : IClassFix
     {
         var ct = TestContext.Current.CancellationToken; await using var f = await StartAsync(postgres, ct);
         await using var production = f.Factory.WithWebHostBuilder(builder => builder.UseEnvironment("Production").ConfigureAppConfiguration((_, config) =>
-            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Identity:JwksUrl"] = "https://benchmark.invalid/jwks" })));
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Identity:JwksUrl"] = "https://benchmark.invalid/jwks",
+                ["Media:Storage:Endpoint"] = "https://storage.benchmark.invalid",
+                ["Media:Storage:AllowLocalHttp"] = "false",
+            })));
         using var client = production.CreateClient();
         using (var live = await client.GetAsync("/health/live", ct)) { Assert.Equal(HttpStatusCode.OK, live.StatusCode); }
         using var scope = production.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<BlogDbContext>();
