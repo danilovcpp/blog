@@ -1,4 +1,5 @@
 import { brand } from "../brands";
+import { AuthorAvatar } from "../components/AuthorAvatar";
 import { useState } from "react";
 import {
     Link,
@@ -49,6 +50,7 @@ export function PostCard({
     compact?: boolean;
 }) {
     const store = useMock();
+    const cover = store.media.cover(post);
     const navigate = useNavigate();
     const cat = store.categories.find((c) => post.categoryIds.includes(c.id));
     const saved = store.bookmarks.includes(post.id);
@@ -61,11 +63,10 @@ export function PostCard({
         <article className={`tech-post ${compact ? "compact-post" : ""}`}>
             <div className="post-byline">
                 <Link to={`/authors/${post.author.id}`} className="person">
-                    <span
+                    <AuthorAvatar
+                        authorId={post.author.id}
                         className={`person-avatar ${post.author.id === localId ? "" : "avatar-ochre"}`}
-                    >
-                        {post.author.id === localId ? "АП" : "ИК"}
-                    </span>
+                    />
                     <strong>{shortAuthor(post.author.id)}</strong>
                 </Link>
                 <span className="byline-dot">·</span>
@@ -111,14 +112,14 @@ export function PostCard({
                     ) : null;
                 })}
             </div>
-            {post.coverUrl && (
+            {cover && (
                 <Link
                     className="tech-post-image"
                     to={`/posts/${post.slug}`}
                     tabIndex={-1}
                     aria-hidden="true"
                 >
-                    <img src={post.coverUrl} alt="" loading="lazy" />
+                    <img src={cover} alt="" loading="lazy" />
                     <span className="photo-label">
                         {brand.article.photoLabel}
                     </span>

@@ -37,8 +37,11 @@ import {
     ScenarioState,
 } from "../components/ui";
 import { useMock, delay } from "../mock/store";
-import { formatDate } from "../mock/data";
+import { formatDate, localId } from "../mock/data";
 import { passwordProblem } from "../mock/rules";
+import { fileLimits } from "../mock/media";
+import { AuthorAvatar } from "../components/AuthorAvatar";
+import { MediaUpload } from "../components/Media";
 
 type AuthKind =
     | "login"
@@ -771,6 +774,20 @@ export function Profile() {
     const [name, setName] = useState(store.displayName);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const [avatarError, setAvatarError] = useState("");
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [avatarReset, setAvatarReset] = useState(0);
+    const removeAvatar = () => {
+        setAvatarError("");
+        try {
+            store.assertAvailable();
+            store.media.removeAvatar();
+            setAvatarReset((value) => value + 1);
+            store.toast("Аватар удалён");
+        } catch (e) {
+            setAvatarError((e as Error).message);
+        }
+    };
     const save = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
@@ -798,15 +815,16 @@ export function Profile() {
                     <h1>
                         Мой профиль<span className="heading-dot">.</span>
                     </h1>
-                    <p>Имя, почта и права вашего аккаунта.</p>
+                    <p>Имя, аватар, почта и права вашего аккаунта.</p>
                 </div>
             </div>
             <ScenarioState>
                 <div className="settings-card">
                     <div className="profile-summary">
-                        <span className="profile-avatar">
-                            {store.displayName[0] || "А"}
-                        </span>
+                        <AuthorAvatar
+                            authorId={localId}
+                            className="profile-avatar"
+                        />
                         <div>
                             <h2>{store.displayName || "Ваш аккаунт"}</h2>
                             <span>В сообществе с 15 октября 2026</span>
@@ -849,6 +867,64 @@ export function Profile() {
                         </div>
                     </form>
                 </div>
+                <section
+                    className="settings-card avatar-settings"
+                    aria-labelledby="avatar-settings-title"
+                >
+                    <h2 id="avatar-settings-title">Аватар</h2>
+                    <div className="avatar-settings-body">
+                        <div
+                            className="avatar-square"
+                            role="img"
+                            aria-label={
+                                store.media.avatar
+                                    ? "Квадратное превью аватара"
+                                    : "Аватар не установлен"
+                            }
+                        >
+                            <AuthorAvatar
+                                authorId={localId}
+                                className="avatar-square-preview"
+                                large
+                            />
+                        </div>
+                        <div className="avatar-settings-controls">
+                            <p className="media-note">
+                                JPEG, PNG или WebP · до {fileLimits.Avatar} МиБ.
+                                Изображение обрезается по центру.
+                            </p>
+                            <MediaUpload
+                                key={avatarReset}
+                                purpose="Avatar"
+                                label={
+                                    store.media.avatar
+                                        ? "Заменить"
+                                        : "Выбрать файл"
+                                }
+                                onReady={() => {
+                                    setAvatarError("");
+                                    store.toast("Аватар обновлён");
+                                }}
+                                onActive={setUploadingAvatar}
+                                actions={
+                                    store.media.avatar && (
+                                        <button
+                                            type="button"
+                                            className="danger-link"
+                                            disabled={uploadingAvatar}
+                                            onClick={removeAvatar}
+                                        >
+                                            Удалить аватар
+                                        </button>
+                                    )
+                                }
+                            />
+                            {avatarError && (
+                                <Alert tone="error">{avatarError}</Alert>
+                            )}
+                        </div>
+                    </div>
+                </section>
                 <div className="settings-card role-card">
                     <ShieldCheck size={24} />
                     <div>

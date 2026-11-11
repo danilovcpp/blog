@@ -39,8 +39,18 @@ import { PostCard, NotFound } from "./Journal";
 import { commentInPublicTree } from "../mock/rules";
 import { tagTone } from "../themes/tones";
 import { PostIcon } from "../components/PostIcon";
+import { AuthorAvatar } from "../components/AuthorAvatar";
+import { ArticleAttachments } from "../components/Media";
+import { mediaPath, type MediaFile } from "../mock/media";
 
-export function Markdown({ value }: { value: string }) {
+export function Markdown({
+    value,
+    images = [],
+}: {
+    value: string;
+    images?: MediaFile[];
+}) {
+    const urls = new Map(images.map((file) => [mediaPath + file.id, file.url]));
     return (
         <ReactMarkdown
             remarkPlugins={[remarkGfm]}
@@ -57,6 +67,19 @@ export function Markdown({ value }: { value: string }) {
                         {children}
                     </a>
                 ),
+                img: ({ node: _node, src, alt, ...props }) => {
+                    const managed =
+                        typeof src === "string" && src.startsWith(mediaPath);
+                    const url = managed ? urls.get(src) : src;
+                    return url ? (
+                        <img
+                            {...props}
+                            src={url}
+                            alt={alt || ""}
+                            loading="lazy"
+                        />
+                    ) : null;
+                },
             }}
         >
             {value}
@@ -93,6 +116,7 @@ export function Article() {
         return () => window.removeEventListener("scroll", update);
     }, [slug]);
     if (!post) return <NotFound />;
+    const cover = store.media.cover(post);
     const category = store.categories.find((c) =>
         post.categoryIds.includes(c.id),
     );
@@ -157,11 +181,10 @@ export function Article() {
                                     className="person"
                                     to={`/authors/${post.author.id}`}
                                 >
-                                    <span className="person-avatar">
-                                        {post.author.id === localId
-                                            ? "АП"
-                                            : "ИК"}
-                                    </span>
+                                    <AuthorAvatar
+                                        authorId={post.author.id}
+                                        className="person-avatar"
+                                    />
                                     <strong>
                                         {shortAuthor(post.author.id)}
                                     </strong>
@@ -183,11 +206,15 @@ export function Article() {
                                     )}
                             </div>
                         </header>
-                        {post.coverUrl && (
+                        {cover && (
                             <img
                                 className="article-cover"
-                                src={post.coverUrl}
-                                alt={brand.article.coverAlt}
+                                src={cover}
+                                alt={
+                                    post.coverUrl.startsWith("/images/")
+                                        ? brand.article.coverAlt
+                                        : ""
+                                }
                             />
                         )}
                         <div className="article-action-bar">
@@ -251,8 +278,14 @@ export function Article() {
                         </div>
                         <div className="article-main">
                             <div className="prose">
-                                <Markdown value={post.markdown} />
+                                <Markdown
+                                    value={post.markdown}
+                                    images={store.media.images(post)}
+                                />
                             </div>
+                            <ArticleAttachments
+                                files={store.media.attachments(post)}
+                            />
                             <div className="article-tags">
                                 {store.tags
                                     .filter((t) => post.tagIds.includes(t.id))
@@ -342,8 +375,11 @@ export function Article() {
                                         key={p.id}
                                         to={`/posts/${p.slug}`}
                                     >
-                                        {p.coverUrl && (
-                                            <img src={p.coverUrl} alt="" />
+                                        {store.media.cover(p) && (
+                                            <img
+                                                src={store.media.cover(p)}
+                                                alt=""
+                                            />
                                         )}
                                         <span>
                                             {p.title}
@@ -568,9 +604,16 @@ function CommentNode({
         <article
             className={`comment-node ${!visible ? "comment-placeholder" : ""}`}
         >
-            <div className="comment-avatar">
-                {visible ? own ? "В" : "Ч" : <MoreHorizontal size={17} />}
-            </div>
+            {visible ? (
+                <AuthorAvatar
+                    authorId={c.author.id}
+                    className="comment-avatar"
+                />
+            ) : (
+                <span className="comment-avatar" aria-hidden="true">
+                    <MoreHorizontal size={17} />
+                </span>
+            )}
             <div className="comment-content">
                 <div className="comment-byline">
                     <strong>

@@ -73,6 +73,18 @@ const sections: {
         links: [
             ["Материалы автора", "/workspace", "author"],
             ["Новый черновик", "/workspace/new", "author"],
+            [
+                "Вложения: сбой передачи и повтор",
+                "/workspace/new",
+                "author",
+                "media-interrupted",
+            ],
+            [
+                "Вложения: истёк срок загрузки",
+                "/workspace/new",
+                "author",
+                "media-expired",
+            ],
             ["Редактор черновика", `/workspace/${pid(10)}/edit`, "author"],
             ["Редактирование Published", `/workspace/${pid(1)}/edit`, "author"],
             ["Снятый с публикации", `/workspace/${pid(11)}/edit`, "author"],
@@ -127,7 +139,7 @@ const sections: {
         title: "05 / Личное пространство",
         description: "Профиль, безопасность и контроль сеансов.",
         links: [
-            ["Профиль", "/account/profile", "reader"],
+            ["Профиль и аватар", "/account/profile", "reader"],
             ["Изменение пароля", "/account/security", "reader"],
             ["Активные сеансы", "/account/sessions", "reader"],
             ["Деактивация аккаунта", "/account/deactivate", "reader"],

@@ -9,6 +9,7 @@ import "./tech.css";
 import "./generic.css";
 import "./themes/tones.css";
 import "./components/post-actions.css";
+import "./components/media.css";
 
 applyTheme();
 const router = createBrowserRouter([{ path: "*", element: <App /> }]);

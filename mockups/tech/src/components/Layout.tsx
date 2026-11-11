@@ -38,6 +38,8 @@ import {
 import { theme, themeName } from "../themes";
 import { Button, Modal } from "./ui";
 import { brand } from "../brands";
+import { localId } from "../mock/data";
+import { AuthorAvatar } from "./AuthorAvatar";
 const Layers = Cpu;
 export function Logo({ light = false }: { light?: boolean }) {
     const Mark = brand.logo === "cpu" ? Cpu : BookOpen;
@@ -204,9 +206,10 @@ export function Header() {
                                     setNotifications(false);
                                 }}
                             >
-                                <span className="avatar">
-                                    <User size={21} strokeWidth={1.5} />
-                                </span>
+                                <AuthorAvatar
+                                    authorId={localId}
+                                    className="avatar"
+                                />
                             </button>
                             {account && (
                                 <div className="account-popover">

@@ -7,6 +7,7 @@ import {
     type ReactNode,
 } from "react";
 import { requireVersion, scalarLength, trimText, viewIsDue } from "./rules";
+import { useMockMedia } from "./media";
 import {
     initialPosts,
     initialComments,
@@ -32,6 +33,8 @@ export type Scenario =
     | "conflict"
     | "rate-limit"
     | "invalid"
+    | "media-interrupted"
+    | "media-expired"
     | "page-error";
 export const personas: Record<Persona, { name: string; roles: Role[] }> = {
     guest: { name: "Гость", roles: [] },
@@ -49,6 +52,8 @@ export const scenarios: Record<Scenario, string> = {
     conflict: "Конфликт версии",
     "rate-limit": "Слишком много запросов",
     invalid: "Неверные данные / ссылка",
+    "media-interrupted": "Файлы: временный сбой передачи",
+    "media-expired": "Файлы: истёк срок загрузки",
     "page-error": "Ошибка следующей страницы",
 };
 export const delay = (ms = 420) =>
@@ -76,6 +81,12 @@ function useMockState() {
     const authed = persona !== "guest";
     const hasRole = (role: Role) =>
         roles.includes(role) || roles.includes("Admin");
+    const media = useMockMedia(
+        posts,
+        (purpose) => authed && (purpose === "Avatar" || hasRole("Author")),
+        authed,
+        hasRole("Admin"),
+    );
     const toast = (text: string, tone: Toast["tone"] = "success") => {
         const id = uid();
         setToasts((items) => [...items, { id, text, tone }]);
@@ -119,6 +130,7 @@ function useMockState() {
             !trimText(post.markdown)
         )
             throw new Error("Перед публикацией добавьте текст.");
+        if (action !== "delete") media.validateLinks(post);
         const now = new Date().toISOString();
         const next = {
             ...post,
@@ -293,6 +305,7 @@ function useMockState() {
     };
     const reset = () => {
         viewRecords.current = {};
+        media.reset();
         setPosts(initialPosts);
         setComments(initialComments);
         setCategories(initialCategories);
@@ -307,6 +320,7 @@ function useMockState() {
     };
     return {
         posts,
+        media,
         bookmarks,
         toggleBookmark,
         setPosts,

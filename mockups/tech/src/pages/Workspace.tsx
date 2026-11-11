@@ -10,6 +10,7 @@ import {
     Copy,
     ExternalLink,
     FileText,
+    FolderOpen,
     Image,
     LockKeyhole,
     MoreHorizontal,
@@ -26,6 +27,13 @@ import { tagTone } from "../themes/tones";
 import { validSlug } from "../mock/rules";
 import { localId, uid, formatDate, type Post } from "../mock/data";
 import {
+    fileLimits,
+    isHttpsCover,
+    linkLimits,
+    mediaPath,
+    type MediaFile,
+} from "../mock/media";
+import {
     Alert,
     Badge,
     Button,
@@ -35,6 +43,7 @@ import {
     ScenarioState,
 } from "../components/ui";
 import { Markdown } from "./Article";
+import { MediaLibrary, MediaRow, MediaUpload } from "../components/Media";
 import { NotFound } from "./Journal";
 
 export function Workspace() {
@@ -153,7 +162,14 @@ export function Workspace() {
                                     to={`/workspace/${post.id}/edit`}
                                     className="workspace-thumbnail"
                                 >
-                                    <img src={post.coverUrl} alt="" />
+                                    {store.media.cover(post) ? (
+                                        <img
+                                            src={store.media.cover(post)}
+                                            alt=""
+                                        />
+                                    ) : (
+                                        <FileText size={21} aria-hidden />
+                                    )}
                                 </Link>
                                 <div className="workspace-row-content">
                                     <div className="row-badges">
@@ -288,6 +304,12 @@ export function Editor() {
     const [mode, setMode] = useState<"write" | "preview">("write");
     const [inspector, setInspector] = useState(true);
     const [busy, setBusy] = useState(false);
+    const [uploadingAttachment, setUploadingAttachment] = useState(false);
+    const [picker, setPicker] = useState<
+        "attachment" | "cover" | "inline" | null
+    >(null);
+    const markdownInput = useRef<HTMLTextAreaElement>(null);
+    const insertionPoint = useRef<number | null>(null);
     const [error, setError] = useState("");
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [confirm, setConfirm] = useState<
@@ -323,11 +345,87 @@ export function Editor() {
                 text="Вы можете редактировать собственные публикации."
             />
         );
-    const change = <K extends keyof Post>(key: K, value: Post[K]) => {
-        setDraft((d) => ({ ...d, [key]: value }));
+    const updateDraft = (patch: Partial<Post>) => {
+        setDraft((d) => ({ ...d, ...patch }));
         setDirty(true);
         dirtyRef.current = true;
-        setFieldErrors((e) => ({ ...e, [key]: "" }));
+        setFieldErrors((errors) => {
+            const next = { ...errors };
+            Object.keys(patch).forEach((key) => delete next[key]);
+            return next;
+        });
+    };
+    const change = <K extends keyof Post>(key: K, value: Post[K]) =>
+        updateDraft({ [key]: value });
+    const attachmentIds = draft.attachmentIds ?? [];
+    const inlineImageIds = draft.inlineImageIds ?? [];
+    const attachments = store.media.attachments(draft);
+    const images = store.media.images(draft);
+    const externalCoverValid =
+        isHttpsCover(draft.coverUrl) ||
+        (draft.coverUrl.startsWith("/images/") &&
+            draft.coverUrl === initial.current.coverUrl);
+    const cover =
+        draft.coverFileId || externalCoverValid ? store.media.cover(draft) : "";
+    const attach = (file: MediaFile) => {
+        if (attachmentIds.includes(file.id)) return;
+        if (attachmentIds.length >= linkLimits.attachments) {
+            store.toast(
+                "Достигнут лимит вложений. Загруженный файл остался в библиотеке.",
+                "error",
+            );
+            return;
+        }
+        change("attachmentIds", [...attachmentIds, file.id]);
+    };
+    const choose = (file: MediaFile) => {
+        if (picker === "attachment") attach(file);
+        if (picker === "cover")
+            updateDraft({ coverFileId: file.id, coverUrl: "" });
+        if (picker === "inline") {
+            if (
+                !inlineImageIds.includes(file.id) &&
+                inlineImageIds.length >= linkLimits.images
+            ) {
+                store.toast(
+                    "В тексте можно связать до 50 изображений. Уберите одно из добавленных изображений.",
+                    "error",
+                );
+                return;
+            }
+            const alt = file.name.replace(/[[\]]/g, "\\$&");
+            const image = "![" + alt + "](" + mediaPath + file.id + ")";
+            const at = insertionPoint.current ?? draft.markdown.length;
+            const before = draft.markdown.slice(0, at);
+            const after = draft.markdown.slice(at);
+            const snippet = (before ? "\n\n" : "") + image + "\n\n";
+            updateDraft({
+                markdown: before + snippet + after,
+                inlineImageIds: inlineImageIds.includes(file.id)
+                    ? inlineImageIds
+                    : [...inlineImageIds, file.id],
+            });
+            requestAnimationFrame(() => {
+                const input = markdownInput.current;
+                input?.focus();
+                input?.setSelectionRange(
+                    at + snippet.length,
+                    at + snippet.length,
+                );
+            });
+        }
+        setPicker(null);
+    };
+    const unlinkImage = (file: MediaFile) => {
+        const url = mediaPath + file.id;
+        const token = new RegExp(
+            "!\\[(?:\\\\.|[^\\]\\\\\\r\\n])*\\]\\(" + url + "\\)",
+            "g",
+        );
+        updateDraft({
+            inlineImageIds: inlineImageIds.filter((id) => id !== file.id),
+            markdown: draft.markdown.replace(token, ""),
+        });
     };
     const validate = () => {
         const errors: Record<string, string> = {};
@@ -340,16 +438,9 @@ export function Editor() {
             errors.description = "Не больше 500 символов.";
         if (new TextEncoder().encode(draft.markdown).length > 1048576)
             errors.markdown = "Текст превышает 1 MiB UTF-8.";
-        if (draft.coverUrl && !draft.coverUrl.startsWith("/images/")) {
-            try {
-                const url = new URL(draft.coverUrl);
-                if (url.protocol !== "https:" || draft.coverUrl.length > 2048)
-                    throw 0;
-            } catch {
-                errors.coverUrl =
-                    "Нужна абсолютная HTTPS-ссылка (до 2048 символов).";
-            }
-        }
+        if (draft.coverUrl && !externalCoverValid)
+            errors.coverUrl =
+                "Нужна абсолютная HTTPS-ссылка (до 2048 символов).";
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -454,6 +545,7 @@ export function Editor() {
                     <Button
                         variant="secondary"
                         busy={busy}
+                        disabled={uploadingAttachment}
                         onClick={() => save()}
                     >
                         <Save size={15} />
@@ -461,6 +553,7 @@ export function Editor() {
                     </Button>
                     <Button
                         busy={busy}
+                        disabled={uploadingAttachment}
                         onClick={() =>
                             setConfirm(
                                 draft.state === "Published"
@@ -480,7 +573,10 @@ export function Editor() {
             {draft.state === "Published" && (
                 <Alert tone="warning">
                     Материал опубликован. Сохранение сразу изменит публичный
-                    текст — отдельной черновой редакции нет.
+                    текст — отдельной черновой редакции нет.{" "}
+                    <Link className="text-link" to={"/posts/" + draft.slug}>
+                        Открыть статью <ArrowUpRight size={14} />
+                    </Link>
                 </Alert>
             )}
             <div className="editor-workspace">
@@ -574,6 +670,20 @@ export function Editor() {
                                 >
                                     ❞
                                 </button>
+                                <button
+                                    className="markdown-media-button"
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => {
+                                        insertionPoint.current =
+                                            markdownInput.current
+                                                ?.selectionEnd ?? null;
+                                        setPicker("inline");
+                                    }}
+                                >
+                                    <Image size={16} />
+                                    <span>Вставить изображение</span>
+                                </button>
                                 <span className="markdown-toolbar-hint">
                                     Поддерживается Markdown
                                 </span>
@@ -583,6 +693,7 @@ export function Editor() {
                             </label>
                             <textarea
                                 id="post-markdown"
+                                ref={markdownInput}
                                 className="editor-textarea"
                                 placeholder={
                                     "## С чего всё началось\n\nОпишите устройство, симптомы и ход работы. Добавьте результаты измерений и выводы."
@@ -593,18 +704,51 @@ export function Editor() {
                                 }
                                 aria-invalid={!!fieldErrors.markdown}
                             />
+                            {fieldErrors.markdown && (
+                                <span className="field-error">
+                                    {fieldErrors.markdown}
+                                </span>
+                            )}
+                            {images.length > 0 && (
+                                <section
+                                    className="editor-inline-media"
+                                    aria-label="Изображения в тексте"
+                                >
+                                    <h3>
+                                        Изображения в тексте{" "}
+                                        <span>
+                                            {inlineImageIds.length} /{" "}
+                                            {linkLimits.images}
+                                        </span>
+                                    </h3>
+                                    <ul className="media-list">
+                                        {images.map((file) => (
+                                            <MediaRow key={file.id} file={file}>
+                                                <button
+                                                    type="button"
+                                                    className="danger-link"
+                                                    disabled={busy}
+                                                    onClick={() =>
+                                                        unlinkImage(file)
+                                                    }
+                                                >
+                                                    Убрать из статьи
+                                                </button>
+                                            </MediaRow>
+                                        ))}
+                                    </ul>
+                                </section>
+                            )}
                         </>
                     ) : (
                         <div className="editor-preview">
                             <h1>{draft.title || "Заголовок статьи"}</h1>
-                            {draft.coverUrl && (
-                                <img
-                                    src={draft.coverUrl}
-                                    alt="Обложка материала"
-                                />
+                            {cover && (
+                                <img src={cover} alt="Обложка материала" />
                             )}
                             <div className="prose">
                                 <Markdown
+                                    images={images}
                                     value={
                                         draft.markdown ||
                                         "*Здесь появится предпросмотр вашего текста.*"
@@ -628,6 +772,84 @@ export function Editor() {
                             / 1024 KiB
                         </span>
                     </div>
+                    <section
+                        className="editor-attachments"
+                        aria-labelledby="editor-attachments"
+                    >
+                        <div className="media-section-heading">
+                            <div>
+                                <h2 id="editor-attachments">Вложения</h2>
+                                <p>
+                                    Читатели смогут скачать файлы после
+                                    публикации. До {fileLimits.Attachment} МиБ
+                                    на файл.
+                                </p>
+                            </div>
+                            <Badge>
+                                {attachmentIds.length} /{" "}
+                                {linkLimits.attachments}
+                            </Badge>
+                        </div>
+                        <MediaUpload
+                            purpose="Attachment"
+                            label="Загрузить"
+                            disabled={
+                                busy ||
+                                draft.author.id !== localId ||
+                                attachmentIds.length >= linkLimits.attachments
+                            }
+                            onReady={attach}
+                            onActive={setUploadingAttachment}
+                            actions={
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={
+                                        busy ||
+                                        attachmentIds.length >=
+                                            linkLimits.attachments
+                                    }
+                                    onClick={() => setPicker("attachment")}
+                                >
+                                    <FolderOpen size={16} /> Выбрать из
+                                    библиотеки
+                                </Button>
+                            }
+                        />
+                        {draft.author.id !== localId && (
+                            <p className="media-note">
+                                Для статьи другого автора используйте файлы из
+                                его библиотеки.
+                            </p>
+                        )}
+                        {attachments.length ? (
+                            <ul className="media-list">
+                                {attachments.map((file) => (
+                                    <MediaRow key={file.id} file={file}>
+                                        <button
+                                            type="button"
+                                            className="danger-link"
+                                            disabled={busy}
+                                            onClick={() =>
+                                                change(
+                                                    "attachmentIds",
+                                                    attachmentIds.filter(
+                                                        (id) => id !== file.id,
+                                                    ),
+                                                )
+                                            }
+                                        >
+                                            Убрать из статьи
+                                        </button>
+                                    </MediaRow>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="media-note">
+                                В статье пока нет вложений.
+                            </p>
+                        )}
+                    </section>
                 </section>
                 {inspector && (
                     <aside className="editor-inspector">
@@ -683,28 +905,61 @@ export function Editor() {
                                 placeholder="О чём материал в двух предложениях"
                             />
                         </Field>
-                        <Field
-                            label="Обложка"
-                            name="post-cover"
-                            error={fieldErrors.coverUrl}
-                            hint="Укажите HTTPS-ссылку на изображение. Загрузка файлов не поддерживается."
+                        <section
+                            className="editor-cover-settings"
+                            aria-labelledby="editor-cover-title"
                         >
-                            <input
-                                id="post-cover"
-                                value={draft.coverUrl}
-                                onChange={(e) =>
-                                    change("coverUrl", e.target.value)
-                                }
-                                placeholder="https://…"
-                            />
-                            {draft.coverUrl && (
+                            <h4 id="editor-cover-title">Обложка</h4>
+                            {cover && (
                                 <img
                                     className="inspector-cover"
-                                    src={draft.coverUrl}
+                                    src={cover}
                                     alt="Предпросмотр обложки"
                                 />
                             )}
-                        </Field>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => setPicker("cover")}
+                            >
+                                <FolderOpen size={16} /> Выбрать из библиотеки
+                            </Button>
+                            <Field
+                                label="Или HTTPS-ссылка"
+                                name="post-cover"
+                                error={fieldErrors.coverUrl}
+                            >
+                                <input
+                                    id="post-cover"
+                                    value={draft.coverUrl}
+                                    onChange={(e) =>
+                                        updateDraft({
+                                            coverUrl: e.target.value.trim(),
+                                            coverFileId: null,
+                                        })
+                                    }
+                                    placeholder="https://…"
+                                    disabled={busy}
+                                    aria-invalid={!!fieldErrors.coverUrl}
+                                />
+                            </Field>
+                            {(draft.coverFileId || draft.coverUrl) && (
+                                <button
+                                    className="danger-link"
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() =>
+                                        updateDraft({
+                                            coverUrl: "",
+                                            coverFileId: null,
+                                        })
+                                    }
+                                >
+                                    Убрать обложку
+                                </button>
+                            )}
+                        </section>
                         <div className="field">
                             <label>
                                 Категории{" "}
@@ -765,6 +1020,30 @@ export function Editor() {
                     </aside>
                 )}
             </div>
+            {picker && (
+                <MediaLibrary
+                    ownerId={draft.author.id}
+                    purpose={
+                        picker === "attachment"
+                            ? "Attachment"
+                            : "PublicationImage"
+                    }
+                    selectedIds={
+                        picker === "attachment"
+                            ? attachmentIds
+                            : picker === "cover" && draft.coverFileId
+                              ? [draft.coverFileId]
+                              : []
+                    }
+                    draftIds={[
+                        ...attachmentIds,
+                        ...inlineImageIds,
+                        ...(draft.coverFileId ? [draft.coverFileId] : []),
+                    ]}
+                    onChoose={choose}
+                    onClose={() => setPicker(null)}
+                />
+            )}
             <Modal
                 open={!!confirm}
                 onClose={closeConfirm}
@@ -836,8 +1115,8 @@ export function Editor() {
                 wide
             >
                 <Alert tone="warning">
-                    Ваш текст остался в форме. Автоматически перезаписывать
-                    новую версию мы не будем.
+                    Ваш текст и выбранные файлы остались в форме. Сравните
+                    версии перед повторным сохранением.
                 </Alert>
                 <div className="conflict-grid">
                     <div>

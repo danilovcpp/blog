@@ -25,6 +25,9 @@ export interface Post {
     description: string;
     markdown: string;
     coverUrl: string;
+    coverFileId?: string | null;
+    inlineImageIds?: string[];
+    attachmentIds?: string[];
     author: { id: string };
     categoryIds: string[];
     tagIds: string[];
